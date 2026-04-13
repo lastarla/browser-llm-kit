@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>测试结果浏览</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h1>测试样本</h1>
+        </div>
+        <div id="test-list" class="test-list"></div>
+      </aside>
+      <main class="content">
+        <section class="score-panel card">
+          <div class="card-header">
+            <h2 id="detail-title">请选择左侧样本</h2>
+            <span id="detail-status" class="status-text">等待选择</span>
+          </div>
+          <div class="score-grid">
+            <div>
+              <div class="label">评分</div>
+              <div id="score-value" class="score-value">--</div>
+            </div>
+            <div>
+              <div class="label">原因</div>
+              <div id="score-reason" class="reason-text">--</div>
+            </div>
+          </div>
+        </section>
+        <section class="compare-grid">
+          <article class="card compare-card">
+            <div class="card-header">
+              <h3>基于大纲的结构化记录</h3>
+            </div>
+            <pre id="result-content" class="content-text">请选择左侧样本</pre>
+          </article>
+          <article class="card compare-card">
+            <div class="card-header">
+              <h3>预期结果（仅参考内容，不参考结构）</h3>
+            </div>
+            <pre id="expected-content" class="content-text">请选择左侧样本</pre>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div id="web-llm-modal" class="web-llm-modal hidden" aria-hidden="true">
+      <div id="web-llm-backdrop" class="web-llm-backdrop"></div>
+      <aside class="web-llm-drawer card" role="dialog" aria-modal="true" aria-labelledby="web-llm-title">
+        <div class="card-header web-llm-header">
+          <div>
+            <h2 id="web-llm-title">Web LLM</h2>
+            <div id="web-llm-subtitle" class="status-text">等待选择样本</div>
+          </div>
+          <button id="web-llm-close" type="button" class="drawer-close-button">关闭</button>
+        </div>
+        <div class="web-llm-body">
+          <div class="web-llm-meta">
+            <div>
+              <div class="label">模型</div>
+              <div>gemma4:e2b</div>
+            </div>
+            <div>
+              <div class="label">状态</div>
+              <div id="web-llm-model-status" class="reason-text">等待触发加载</div>
+              <div class="web-llm-progress">
+                <div id="web-llm-progress-bar" class="web-llm-progress-bar"></div>
+              </div>
+            </div>
+          </div>
+          <section class="card web-llm-score-card">
+            <div class="card-header">
+              <h3>执行结果评分</h3>
+              <span id="web-llm-score-status" class="status-text">未开始</span>
+            </div>
+            <div class="web-llm-score-grid">
+              <div>
+                <div class="label">评分</div>
+                <div id="web-llm-score-value" class="score-value">--</div>
+                <div id="web-llm-score-meta" class="status-text">模型：gpt-5.4（服务端）</div>
+              </div>
+              <div>
+                <div class="label">原因</div>
+                <div id="web-llm-score-reason" class="reason-text">点击左侧 Web LLM 按钮后开始评分</div>
+              </div>
+            </div>
+          </section>
+          <section class="web-llm-grid">
+            <article class="card web-llm-card">
+              <div class="card-header">
+                <h3>基于大纲的结构化记录</h3>
+                <span id="web-llm-result-status" class="status-text">未开始</span>
+              </div>
+              <pre id="web-llm-result" class="content-text">点击左侧 Web LLM 按钮后开始生成</pre>
+            </article>
+            <article class="card web-llm-card">
+              <div class="card-header">
+                <h3>预期结果（仅参考内容，不参考结构）</h3>
+                <span class="status-text">只读</span>
+              </div>
+              <pre id="web-llm-expected" class="content-text">点击左侧 Web LLM 按钮后加载预期结果</pre>
+            </article>
+            <article class="card web-llm-card">
+              <div class="card-header">
+                <h3>达成结果核对列表</h3>
+                <span id="web-llm-achieved-status" class="status-text">未开始</span>
+              </div>
+              <pre id="web-llm-achieved" class="content-text">点击左侧 Web LLM 按钮后开始生成</pre>
+              <div class="card-header web-llm-debug-header">
+                <h3>调试信息</h3>
+              </div>
+              <pre id="web-llm-achieved-debug" class="content-text web-llm-debug-content">等待生成</pre>
+            </article>
+          </section>
+        </div>
+      </aside>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
