@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "build": "webpack --config webpack.config.cjs"
+    "build": "webpack --config webpack.config.cjs",
+    "test": "node --test test/*.test.js",
+    "verify": "npm test && npm run build"
   },
   "dependencies": {
     "@mediapipe/tasks-genai": "^0.10.27"

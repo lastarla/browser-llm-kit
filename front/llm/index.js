@@ -9,6 +9,14 @@ const WASM_PATH = '/wasm';
 const MODEL_ASSET_BASE_PATH = '/assets/llm';
 const DEFAULT_CACHE_VERSION = 'v1';
 const DEFAULT_WASM_CACHE_PATHS = [WASM_PATH];
+const DEFAULT_WASM_PREFETCH_URLS = [
+  '/wasm/genai_wasm_internal.js',
+  '/wasm/genai_wasm_internal.wasm',
+  '/wasm/genai_wasm_module_internal.js',
+  '/wasm/genai_wasm_module_internal.wasm',
+  '/wasm/genai_wasm_nosimd_internal.js',
+  '/wasm/genai_wasm_nosimd_internal.wasm',
+];
 
 function buildTaskSnapshot(task) {
   if (!task) {
@@ -92,13 +100,18 @@ class LLM {
     }
 
     const cacheVersion = String(version || config.cacheVersion || DEFAULT_CACHE_VERSION).trim();
+    const includeUrls = [
+      config.assetPath,
+      ...(Array.isArray(config.wasmPrefetchUrls) ? config.wasmPrefetchUrls : DEFAULT_WASM_PREFETCH_URLS),
+    ].filter(Boolean);
+
     return {
       serviceWorkerUrl: DEFAULT_SERVICE_WORKER_URL,
       cachePrefix: DEFAULT_CACHE_PREFIX,
       model: config.cacheKey || model,
       version: cacheVersion,
       includePathPrefixes: Array.isArray(config.wasmCachePaths) ? config.wasmCachePaths : DEFAULT_WASM_CACHE_PATHS,
-      includeUrls: [],
+      includeUrls,
     };
   }
 
@@ -116,6 +129,9 @@ class LLM {
       .then((result) => {
         if (!navigator.serviceWorker.controller) {
           this.emitStatus(model, '缓存将在下次页面导航后生效');
+        }
+        if (result?.prefetchError) {
+          this.emitStatus(model, `模型预取失败：${result.prefetchError}`);
         }
         return result;
       })

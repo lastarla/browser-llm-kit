@@ -1,4 +1,5 @@
 import LLM from './llm/index.js';
+import { buildAssetCacheName } from './llm/asset-cache.js';
 import buildStructuredRecordPrompt from '../prompt/structured-record-prompt.js';
 import buildAchievedResultsPrompt, { buildDefaultAchievedResults } from '../prompt/achieved-results-prompt.js';
 
@@ -22,6 +23,9 @@ const elements = {
   webLlmClose: document.querySelector('#web-llm-close'),
   webLlmSubtitle: document.querySelector('#web-llm-subtitle'),
   webLlmModelStatus: document.querySelector('#web-llm-model-status'),
+  webLlmCacheSummary: document.querySelector('#web-llm-cache-summary'),
+  webLlmCacheRefresh: document.querySelector('#web-llm-cache-refresh'),
+  webLlmCacheDetails: document.querySelector('#web-llm-cache-details'),
   webLlmProgressBar: document.querySelector('#web-llm-progress-bar'),
   webLlmResult: document.querySelector('#web-llm-result'),
   webLlmExpected: document.querySelector('#web-llm-expected'),
@@ -257,6 +261,84 @@ function setWebLlmModelStatus(text, progress = null) {
   if (progress !== null) {
     elements.webLlmProgressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
   }
+}
+
+function setWebLlmCacheDebug(summaryText, detailText) {
+  elements.webLlmCacheSummary.textContent = summaryText;
+  elements.webLlmCacheDetails.textContent = detailText;
+}
+
+function formatCacheRequestPath(url) {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return String(url || '');
+  }
+}
+
+async function collectWebLlmCacheDebug() {
+  if (!('serviceWorker' in navigator) || !('caches' in window)) {
+    return {
+      summary: '缓存：当前浏览器不支持 Service Worker/Cache API',
+      detail: 'serviceWorker 或 caches API 不可用',
+    };
+  }
+
+  const cacheConfig = llm.getModelCacheConfig(WEB_LLM_MODEL);
+  const cacheName = cacheConfig.cacheName || buildAssetCacheName({
+    cachePrefix: cacheConfig.cachePrefix,
+    model: cacheConfig.model,
+    version: cacheConfig.version,
+  });
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  const cacheKeys = await caches.keys();
+  const hasTargetCache = cacheKeys.includes(cacheName);
+
+  let requestPaths = [];
+  if (hasTargetCache) {
+    const cache = await caches.open(cacheName);
+    const requests = await cache.keys();
+    requestPaths = requests.map((request) => formatCacheRequestPath(request.url));
+  }
+
+  const modelCached = requestPaths.some((path) => path.endsWith('.task'));
+  const wasmCachedCount = requestPaths.filter((path) => path.startsWith('/wasm/')).length;
+
+  const summary = `缓存：${requestPaths.length} 条（模型 ${modelCached ? '已缓存' : '未缓存'}，WASM ${wasmCachedCount} 条）`;
+  const controllerNote = navigator.serviceWorker.controller
+    ? 'controller=true（当前页面已被 SW 控制）'
+    : 'controller=false（当前页面尚未被 SW 控制，但缓存仍可通过页面侧预取写入）';
+  const detail = JSON.stringify({
+    cacheName,
+    controller: Boolean(navigator.serviceWorker.controller),
+    controllerNote,
+    registrations: registrations.length,
+    cacheKeys,
+    cachedPaths: requestPaths,
+  }, null, 2);
+
+  return {
+    summary,
+    detail,
+  };
+}
+
+async function refreshWebLlmCacheDebug() {
+  try {
+    const debug = await collectWebLlmCacheDebug();
+    setWebLlmCacheDebug(debug.summary, debug.detail);
+  } catch (error) {
+    setWebLlmCacheDebug(
+      '缓存：检查失败',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
+function scheduleWebLlmCacheDebugRefresh(delayMs = 0) {
+  window.setTimeout(() => {
+    refreshWebLlmCacheDebug();
+  }, delayMs);
 }
 
 function openWebLlmModal() {
@@ -505,6 +587,30 @@ async function fetchTestDetail(index) {
   return data;
 }
 
+async function ensureTestDetail(index) {
+  const response = await fetch(`/tests/${index}/ensure`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || data.details || '补全详情失败');
+  }
+
+  updateTestSummary(index, data);
+  renderList();
+  return data;
+}
+
+function needsPreparedDetail(index) {
+  const item = getTestItem(index);
+  return Boolean(item) && (!item.hasResult || !item.hasScore);
+}
+
 async function fetchWebLlmScore(index, result) {
   const response = await fetch(`/tests/${index}/web-llm-score`, {
     method: 'POST',
@@ -544,6 +650,7 @@ async function ensureWebLlmReady() {
   setWebLlmModelStatus('下载模型', 20);
   llmReadyPromise = llm.load(WEB_LLM_MODEL)
     .then((result) => {
+      refreshWebLlmCacheDebug();
       return result;
     })
     .catch((error) => {
@@ -575,7 +682,9 @@ async function loadDetail(index) {
   renderLoading(index);
 
   try {
-    const data = await fetchTestDetail(index);
+    const data = needsPreparedDetail(index)
+      ? await ensureTestDetail(index)
+      : await fetchTestDetail(index);
     renderDetail(data);
   } catch (error) {
     renderError(error instanceof Error ? error.message : String(error));
@@ -602,6 +711,7 @@ async function runWebLlm(index) {
   const listItem = getTestItem(index);
   elements.webLlmSubtitle.textContent = listItem?.name || `样本 ${index}`;
   setWebLlmScoreState('准备中', '--', '正在准备服务端评分...', '模型：gpt-5.4（服务端）');
+  setWebLlmCacheDebug('缓存：检查中', '正在读取 Service Worker 与 Cache Storage 状态...');
   setWebLlmCardState('result', '准备中', '正在准备模型与样本数据...');
   elements.webLlmExpected.textContent = '正在加载预期结果...';
   setWebLlmCardState('achieved', '准备中', '正在准备模型与样本数据...');
@@ -609,6 +719,9 @@ async function runWebLlm(index) {
 
   try {
     await ensureWebLlmReady();
+    await refreshWebLlmCacheDebug();
+    scheduleWebLlmCacheDebugRefresh(2000);
+    scheduleWebLlmCacheDebugRefresh(5000);
     const detail = await fetchTestDetail(index);
     if (currentRequestId !== webLlmRequestId) {
       return;
@@ -748,7 +861,9 @@ async function runWebLlm(index) {
               : '已返回原文',
       finalAchievedJson || rawOutput,
     );
+    scheduleWebLlmCacheDebugRefresh(300);
     await scorePromise;
+    scheduleWebLlmCacheDebugRefresh(300);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (currentRequestId !== webLlmRequestId) {
@@ -805,6 +920,9 @@ async function rerunTest(index) {
 
 elements.webLlmClose.addEventListener('click', closeWebLlmModal);
 elements.webLlmBackdrop.addEventListener('click', closeWebLlmModal);
+elements.webLlmCacheRefresh.addEventListener('click', () => {
+  refreshWebLlmCacheDebug();
+});
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !elements.webLlmModal.classList.contains('hidden')) {
     closeWebLlmModal();

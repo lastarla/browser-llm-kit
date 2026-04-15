@@ -14,6 +14,35 @@ function normalizeCacheSegment(value) {
   return normalized || 'default';
 }
 
+function normalizeIncludeUrls(urls) {
+  if (!Array.isArray(urls)) {
+    return [];
+  }
+
+  const normalizedUrls = [];
+  const seen = new Set();
+
+  for (const item of urls) {
+    const raw = String(item ?? '').trim();
+    if (!raw) {
+      continue;
+    }
+
+    const normalized = typeof window === 'undefined'
+      ? raw
+      : new URL(raw, window.location.href).href;
+
+    if (seen.has(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    normalizedUrls.push(normalized);
+  }
+
+  return normalizedUrls;
+}
+
 export function buildAssetCacheName({
   model,
   version,
@@ -97,6 +126,37 @@ function sendWorkerMessage(worker, message) {
   });
 }
 
+async function prefetchUrlsFromPage(cacheName, urls) {
+  if (!cacheName || !Array.isArray(urls) || urls.length === 0) {
+    return [];
+  }
+
+  const cache = await caches.open(cacheName);
+  const cachedUrls = [];
+
+  for (const url of urls) {
+    const request = new Request(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+    });
+    const hit = await cache.match(request, { ignoreVary: true });
+    if (hit) {
+      cachedUrls.push(url);
+      continue;
+    }
+
+    const response = await fetch(request);
+    if (!response.ok) {
+      throw new Error(`ASSET_PREFETCH_FAILED:${response.status}:${url}`);
+    }
+
+    await cache.put(request, response.clone());
+    cachedUrls.push(url);
+  }
+
+  return cachedUrls;
+}
+
 function normalizeConfig({
   serviceWorkerUrl = DEFAULT_SERVICE_WORKER_URL,
   cachePrefix = DEFAULT_CACHE_PREFIX,
@@ -123,7 +183,7 @@ function normalizeConfig({
     model: normalizedModel,
     version: normalizedVersion,
     includePathPrefixes: Array.from(new Set(includePathPrefixes.map((item) => String(item ?? '').trim()).filter(Boolean))),
-    includeUrls: Array.from(new Set(includeUrls.map((item) => String(item ?? '').trim()).filter(Boolean))),
+    includeUrls: normalizeIncludeUrls(includeUrls),
   };
 }
 
@@ -173,10 +233,44 @@ export async function registerAssetCache(options) {
       throw new Error(result?.reason || 'NO_SERVICE_WORKER');
     }
 
+    let prefetchedUrls = [];
+    let prefetchError = '';
+
+    if (config.includeUrls.length > 0) {
+      const prefetchResult = await sendWorkerMessage(worker, {
+        type: 'prefetch_asset_urls',
+        cacheName: config.cacheName,
+        urls: config.includeUrls,
+      });
+
+      if (prefetchResult?.ok) {
+        prefetchedUrls = Array.isArray(prefetchResult.cachedUrls) ? prefetchResult.cachedUrls : [];
+      } else {
+        prefetchError = prefetchResult?.reason || 'ASSET_PREFETCH_FAILED';
+      }
+    }
+
+    // Fallback: when SW is not controlling the current page yet, warm cache directly from page context.
+    if (config.includeUrls.length > 0 && (prefetchedUrls.length === 0 || prefetchError)) {
+      try {
+        const pagePrefetchedUrls = await prefetchUrlsFromPage(config.cacheName, config.includeUrls);
+        if (pagePrefetchedUrls.length > 0) {
+          prefetchedUrls = Array.from(new Set([...prefetchedUrls, ...pagePrefetchedUrls]));
+          prefetchError = '';
+        }
+      } catch (error) {
+        if (!prefetchError) {
+          prefetchError = error instanceof Error ? error.message : String(error);
+        }
+      }
+    }
+
     return {
       supported: true,
       registration,
       cacheName: config.cacheName,
+      prefetchedUrls,
+      prefetchError,
     };
   })().catch((error) => {
     registrationPromises.delete(registrationKey);

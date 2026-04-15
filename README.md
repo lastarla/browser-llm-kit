@@ -10,6 +10,20 @@ npm start
 
 默认监听 `http://localhost:3001`。
 
+构建默认只产出前端代码、样式、SW 和 WASM，不再把 1.9G 模型文件复制到 `dist/`。运行时由服务端直接从 `front/assets` 提供模型资源。
+
+如果你确实需要把模型一起复制进构建产物，可以显式开启：
+
+```bash
+COPY_LLM_ASSETS=true npm run build
+```
+
+运行回归测试：
+
+```bash
+npm test
+```
+
 ## 环境变量
 
 - `PORT`：服务端口，默认 `3001`
@@ -93,7 +107,7 @@ curl -X POST http://localhost:3001/ask \
 
 ### 3. `POST /run-tests`
 
-按样本执行生成，并把生成结果写回 `config/test.js` 的 `result` 字段。
+按样本执行生成，并把生成结果写回 `config/tests.json` 的 `result` 字段。
 
 **请求体字段：**
 
@@ -150,7 +164,7 @@ curl -X POST http://localhost:3001/run-tests \
 
 ### 4. `POST /score-tests`
 
-按样本对已有 `result` 进行评分，并把评分接口返回的完整结构化 JSON 写回 `config/test.js` 的 `score` 字段。
+按样本对已有 `result` 进行评分，并把评分接口返回的完整结构化 JSON 写回 `config/tests.json` 的 `score` 字段。
 
 **请求体字段：**
 
@@ -214,7 +228,7 @@ curl -X POST http://localhost:3001/score-tests \
 
 ### 5. `POST /run-and-score-tests`
 
-先执行生成，再立即评分，并把 `result` 与 `score` 一并写回 `config/test.js`。
+先执行生成，再立即评分，并把 `result` 与 `score` 一并写回 `config/tests.json`。
 
 **请求体字段：**
 
@@ -267,7 +281,7 @@ curl -X POST http://localhost:3001/run-and-score-tests \
 
 ## 测试数据回写说明
 
-测试样本位于 [config/test.js](config/test.js)。
+测试样本位于 [config/tests.json](config/tests.json)。
 
 - `POST /run-tests`：更新 `result`
 - `POST /score-tests`：更新 `score`

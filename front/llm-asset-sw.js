@@ -1,5 +1,5 @@
 const cacheRules = new Map();
-const SW_VERSION = '2026-04-12-click-cache-v2';
+const SW_VERSION = '2026-04-15-cache-prefetch-v3';
 
 function normalizePathPrefixes(prefixes) {
   return Array.isArray(prefixes)

@@ -6,7 +6,7 @@ import json
 import re
 from pathlib import Path
 
-TEST_FILE = Path('/Users/starlee/code/demo/gemma4/config/test.js')
+TEST_FILE = Path.cwd() / 'config' / 'tests.json'
 
 BUSINESS_FIELDS = {
     '沟通主题',
@@ -25,15 +25,6 @@ GROUP_TITLES = {
     '会议主要内容与决议。',
     '行动项/待办事项清单',
 }
-
-
-def extract_tests_source(text: str):
-    prefix = 'const tests = '
-    suffix = ';\n\nexport default tests;\n'
-    if not text.startswith(prefix) or not text.endswith(suffix):
-        raise SystemExit('config/test.js 格式不符合预期')
-    return text[len(prefix):-len(suffix)]
-
 
 def clean_heading(raw: str) -> str:
     heading = raw.strip()
@@ -113,16 +104,12 @@ def build_format_result(result):
 
 
 source = TEST_FILE.read_text(encoding='utf-8')
-body = extract_tests_source(source)
-body = sanitize_embedded_json_literals(body)
-body = re.sub(r':\s*null\b', ': None', body)
-body = re.sub(r':\s*true\b', ': True', body)
-body = re.sub(r':\s*false\b', ': False', body)
-tests = eval(body, {'__builtins__': {}}, {})
+body = sanitize_embedded_json_literals(source)
+tests = json.loads(body)
 
 for item in tests:
     item['format_result'] = build_format_result(item.get('result'))
 
-serialized = 'const tests = ' + json.dumps(tests, ensure_ascii=False, indent=2) + ';\n\nexport default tests;\n'
+serialized = json.dumps(tests, ensure_ascii=False, indent=2) + '\n'
 TEST_FILE.write_text(serialized, encoding='utf-8')
 PY

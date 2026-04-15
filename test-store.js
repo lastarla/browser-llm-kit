@@ -1,20 +1,34 @@
-import { pathToFileURL } from 'node:url';
-import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const TEST_FILE_PATH = '/Users/starlee/code/demo/gemma4/config/test.js';
+const PROJECT_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_TEST_STORE_PATH = path.resolve(PROJECT_ROOT, 'config/tests.json');
 
-function serializeTests(tests) {
-  return `const tests = ${JSON.stringify(tests, null, 2)};\n\nexport default tests;\n`;
+async function fileExists(filePath) {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export async function loadTests() {
-  const moduleUrl = `${pathToFileURL(TEST_FILE_PATH).href}?t=${Date.now()}`;
+async function loadLegacyTests(filePath) {
+  const moduleUrl = `${pathToFileURL(filePath).href}?t=${Date.now()}`;
   const { default: tests } = await import(moduleUrl);
   return tests;
 }
 
-export async function saveTests(tests) {
-  await writeFile(TEST_FILE_PATH, serializeTests(tests), 'utf8');
+function serializeTests(tests) {
+  return `${JSON.stringify(tests, null, 2)}\n`;
+}
+
+function resolveTestStorePath() {
+  const configuredPath = process.env.TEST_STORE_PATH?.trim();
+  return configuredPath
+    ? path.resolve(configuredPath)
+    : DEFAULT_TEST_STORE_PATH;
 }
 
 export function findTestIndex(tests, { index, name, runAll } = {}) {
@@ -46,20 +60,63 @@ export function pickTests(tests, selector = {}) {
   return [{ item: tests[index], index }];
 }
 
-export async function updateTestFields(updates, existingTests = null) {
-  const tests = existingTests ? [...existingTests] : await loadTests();
+export function createTestStore(filePath = resolveTestStorePath(), options = {}) {
+  const resolvedPath = path.resolve(filePath);
+  const legacyPath = options.legacyPath ?? null;
 
-  for (const update of updates) {
-    if (!Number.isInteger(update.index) || update.index < 0 || update.index >= tests.length) {
-      continue;
+  async function loadTests() {
+    if (await fileExists(resolvedPath)) {
+      const raw = await readFile(resolvedPath, 'utf8');
+      const tests = JSON.parse(raw);
+      if (!Array.isArray(tests)) {
+        throw new Error(`TEST_STORE_INVALID:${resolvedPath}`);
+      }
+      return tests;
     }
 
-    tests[update.index] = {
-      ...tests[update.index],
-      ...update.fields,
-    };
+    if (legacyPath && await fileExists(legacyPath)) {
+      return loadLegacyTests(legacyPath);
+    }
+
+    throw new Error(`TEST_STORE_NOT_FOUND:${resolvedPath}`);
   }
 
-  await saveTests(tests);
-  return tests;
+  async function saveTests(tests) {
+    await mkdir(path.dirname(resolvedPath), { recursive: true });
+    await writeFile(resolvedPath, serializeTests(tests), 'utf8');
+  }
+
+  async function updateTestFields(updates, existingTests = null) {
+    const tests = existingTests ? [...existingTests] : await loadTests();
+
+    for (const update of updates) {
+      if (!Number.isInteger(update.index) || update.index < 0 || update.index >= tests.length) {
+        continue;
+      }
+
+      tests[update.index] = {
+        ...tests[update.index],
+        ...update.fields,
+      };
+    }
+
+    await saveTests(tests);
+    return tests;
+  }
+
+  return {
+    filePath: resolvedPath,
+    loadTests,
+    saveTests,
+    updateTestFields,
+    findTestIndex,
+    pickTests,
+  };
 }
+
+const defaultTestStore = createTestStore();
+
+export const TEST_FILE_PATH = defaultTestStore.filePath;
+export const loadTests = defaultTestStore.loadTests;
+export const saveTests = defaultTestStore.saveTests;
+export const updateTestFields = defaultTestStore.updateTestFields;
