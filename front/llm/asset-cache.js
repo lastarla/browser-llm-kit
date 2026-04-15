@@ -131,10 +131,25 @@ async function prefetchUrlsFromPage(cacheName, urls) {
     return [];
   }
 
+  // Large model blobs (e.g. .task) can overwhelm renderer memory when prefetched from page context.
+  // Keep page-context prefetch limited to smaller runtime assets (wasm/js/css/html/json).
+  const safeUrls = urls.filter((url) => {
+    try {
+      const { pathname } = new URL(url, window.location.href);
+      return !pathname.endsWith('.task') && !pathname.endsWith('.bin');
+    } catch {
+      return false;
+    }
+  });
+
+  if (safeUrls.length === 0) {
+    return [];
+  }
+
   const cache = await caches.open(cacheName);
   const cachedUrls = [];
 
-  for (const url of urls) {
+  for (const url of safeUrls) {
     const request = new Request(url, {
       method: 'GET',
       credentials: 'same-origin',
