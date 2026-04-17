@@ -1,6 +1,16 @@
-const SCORE_API_BASE_URL = process.env.ANTHROPIC_BASE_URL?.trim() || 'https://aihub.firstshare.cn';
-const SCORE_API_TOKEN = process.env.ANTHROPIC_AUTH_TOKEN?.trim() || '';
-const SCORE_MODEL = 'gpt-5.4';
+import { DEFAULT_MODEL, askOllama } from './generate-service.js';
+
+function getScoreApiBaseUrl() {
+  return process.env.ANTHROPIC_BASE_URL?.trim() || 'https://aihub.firstshare.cn';
+}
+
+function getScoreApiToken() {
+  return process.env.ANTHROPIC_AUTH_TOKEN?.trim() || '';
+}
+
+function getScoreModel() {
+  return 'gpt-5.4';
+}
 
 export function extractTextFromScoreResponse(data) {
   const messageContent = data?.choices?.[0]?.message?.content;
@@ -144,15 +154,17 @@ export async function readScoreStream(response) {
 }
 
 export async function askScoreModel(prompt) {
-  if (!SCORE_API_TOKEN) {
+  const apiToken = getScoreApiToken();
+  if (!apiToken) {
     throw new Error('SCORE_API_TOKEN_MISSING');
   }
 
-  const normalizedBaseUrl = SCORE_API_BASE_URL.replace(/\/$/, '');
+  const normalizedBaseUrl = getScoreApiBaseUrl().replace(/\/$/, '');
+  const scoreModel = getScoreModel();
 
   async function sendScoreRequest(useStreaming) {
     const requestBody = {
-      model: SCORE_MODEL,
+      model: scoreModel,
       messages: [
         {
           role: 'user',
@@ -174,7 +186,7 @@ export async function askScoreModel(prompt) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${SCORE_API_TOKEN}`,
+        Authorization: `Bearer ${apiToken}`,
       },
       body: JSON.stringify(requestBody),
     });
@@ -281,7 +293,24 @@ export async function scoreSample(sample, scorePrompt) {
     result: stringifyScoreInput(sample),
   });
 
-  const answer = await askScoreModel(prompt);
+  let answer;
+  let model = getScoreModel();
+  let source = 'server';
+
+  try {
+    answer = await askScoreModel(prompt);
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== 'SCORE_API_TOKEN_MISSING') {
+      throw error;
+    }
+
+    answer = await askOllama({
+      model: DEFAULT_MODEL,
+      prompt,
+    });
+    model = DEFAULT_MODEL;
+    source = 'ollama';
+  }
 
   let scorePayload;
   try {
@@ -291,6 +320,8 @@ export async function scoreSample(sample, scorePrompt) {
   }
 
   return {
+    model,
+    source,
     scorePayload,
     ...extractScoreDetails(scorePayload),
   };

@@ -10,6 +10,12 @@ npm start
 
 默认监听 `http://localhost:3001`。
 
+如果要让浏览器里的 `Web LLM` 在局域网地址下正常工作，需要 HTTPS。现在服务端可直接读取证书启动原生 HTTPS：
+
+```bash
+npm run start:https
+```
+
 构建默认只产出前端代码、样式、SW 和 WASM，不再把 1.9G 模型文件复制到 `dist/`。运行时由服务端直接从 `front/assets` 提供模型资源。
 
 如果你确实需要把模型一起复制进构建产物，可以显式开启：
@@ -27,10 +33,20 @@ npm test
 ## 环境变量
 
 - `PORT`：服务端口，默认 `3001`
+- `HTTPS_KEY_FILE`：可选，HTTPS 私钥文件路径；与 `HTTPS_CERT_FILE` 必须同时提供
+- `HTTPS_CERT_FILE`：可选，HTTPS 证书文件路径；与 `HTTPS_KEY_FILE` 必须同时提供
 - `OLLAMA_HOST`：本地 Ollama 地址，默认 `http://localhost:11434`
 - `OLLAMA_MODEL`：生成模型，默认 `gemma4:e2b`
 - `ANTHROPIC_BASE_URL`：评分接口基础地址，默认 `https://aihub.firstshare.cn`
 - `ANTHROPIC_AUTH_TOKEN`：评分接口 Bearer Token
+
+为了本机内网体验方便，仓库还提供了一个固定脚本：
+
+```bash
+npm run start:https
+```
+
+它等价于使用 `.local/certs/gemma4-preview-key.pem` 和 `.local/certs/gemma4-preview.pem` 在 `3443` 端口启动原生 HTTPS 服务。
 
 ## 处理链路
 

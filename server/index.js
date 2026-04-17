@@ -1,4 +1,6 @@
 import http from 'node:http';
+import https from 'node:https';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { buildAskPrompt, DEFAULT_MODEL, askOllama } from './services/generate-service.js';
 import { ensureTestReady, runPipeline } from './services/test-pipeline.js';
@@ -69,6 +71,23 @@ function validateAskBody(body) {
 
 function isDirectExecution() {
   return Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href === import.meta.url;
+}
+
+export function resolveServerRuntimeOptions(options = {}) {
+  const port = Number(options.port ?? DEFAULT_PORT);
+  const httpsKeyFile = String(options.httpsKeyFile ?? process.env.HTTPS_KEY_FILE ?? '').trim();
+  const httpsCertFile = String(options.httpsCertFile ?? process.env.HTTPS_CERT_FILE ?? '').trim();
+
+  if ((httpsKeyFile && !httpsCertFile) || (!httpsKeyFile && httpsCertFile)) {
+    throw new Error('HTTPS_CERT_CONFIG_INVALID');
+  }
+
+  return {
+    port,
+    protocol: httpsKeyFile && httpsCertFile ? 'https' : 'http',
+    httpsKeyFile,
+    httpsCertFile,
+  };
 }
 
 export function createRequestHandler(options = {}) {
@@ -198,15 +217,26 @@ export function createRequestHandler(options = {}) {
 }
 
 export function createServer(options = {}) {
-  return http.createServer(createRequestHandler(options));
+  const runtimeOptions = options.runtimeOptions ?? resolveServerRuntimeOptions(options);
+  const requestHandler = createRequestHandler(options);
+
+  if (runtimeOptions.protocol === 'https') {
+    const tlsOptions = options.tls ?? {
+      key: readFileSync(runtimeOptions.httpsKeyFile, 'utf8'),
+      cert: readFileSync(runtimeOptions.httpsCertFile, 'utf8'),
+    };
+    return https.createServer(tlsOptions, requestHandler);
+  }
+
+  return http.createServer(requestHandler);
 }
 
 export function startServer(options = {}) {
-  const port = Number(options.port ?? DEFAULT_PORT);
-  const server = createServer({ ...options, port });
+  const runtimeOptions = resolveServerRuntimeOptions(options);
+  const server = createServer({ ...options, runtimeOptions });
 
-  server.listen(port, () => {
-    console.log(`Server listening on http://localhost:${port}`);
+  server.listen(runtimeOptions.port, () => {
+    console.log(`Server listening on ${runtimeOptions.protocol}://localhost:${runtimeOptions.port}`);
   });
 
   return server;

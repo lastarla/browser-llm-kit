@@ -12,6 +12,8 @@ const DEFAULT_USER = {
 
 const elements = {
   list: document.querySelector('#test-list'),
+  sidebarInstallStatus: document.querySelector('#sidebar-install-status'),
+  sidebarInstallText: document.querySelector('#sidebar-install-text'),
   title: document.querySelector('#detail-title'),
   status: document.querySelector('#detail-status'),
   score: document.querySelector('#score-value'),
@@ -25,8 +27,13 @@ const elements = {
   webLlmModelStatus: document.querySelector('#web-llm-model-status'),
   webLlmCacheSummary: document.querySelector('#web-llm-cache-summary'),
   webLlmCacheRefresh: document.querySelector('#web-llm-cache-refresh'),
+  webLlmDiagnosticsToggle: document.querySelector('#web-llm-diagnostics-toggle'),
+  webLlmDiagnosticsPanel: document.querySelector('#web-llm-diagnostics-panel'),
   webLlmCacheDetails: document.querySelector('#web-llm-cache-details'),
+  webLlmInstallFacts: document.querySelector('#web-llm-install-facts'),
+  webLlmAssetList: document.querySelector('#web-llm-asset-list'),
   webLlmProgressBar: document.querySelector('#web-llm-progress-bar'),
+  webLlmInstallHint: document.querySelector('#web-llm-install-hint'),
   webLlmResult: document.querySelector('#web-llm-result'),
   webLlmExpected: document.querySelector('#web-llm-expected'),
   webLlmResultStatus: document.querySelector('#web-llm-result-status'),
@@ -48,10 +55,93 @@ const rerunningIndexes = new Set();
 const llm = new LLM();
 window.llm = llm;
 let llmReadyPromise = null;
+let releaseInstallStateListener = null;
+let webLlmDebugRefreshTimer = null;
+let webLlmDiagnosticsExpanded = false;
+let latestInstallSnapshot = null;
+let installTelemetry = createInstallTelemetry();
 let webLlmTaskState = {
   structuredTaskId: null,
   achievedTaskId: null,
 };
+
+ensureWebLlmInstallListeners();
+
+function createInstallTelemetry() {
+  return {
+    startedAt: 0,
+    lastBytes: null,
+    lastTimestamp: 0,
+    smoothedBytesPerSecond: null,
+  };
+}
+
+function resetInstallTelemetry(snapshot = null) {
+  installTelemetry = createInstallTelemetry();
+  if (snapshot?.startedAt) {
+    installTelemetry.startedAt = snapshot.startedAt;
+  }
+}
+
+function updateInstallTelemetry(snapshot) {
+  if (!snapshot) {
+    return;
+  }
+
+  if (snapshot.startedAt !== installTelemetry.startedAt) {
+    resetInstallTelemetry(snapshot);
+  }
+
+  const now = Date.now();
+  const downloadedBytes = typeof snapshot.progress?.downloadedBytes === 'number'
+    ? snapshot.progress.downloadedBytes
+    : null;
+
+  if (typeof downloadedBytes === 'number' && downloadedBytes >= 0) {
+    if (typeof installTelemetry.lastBytes === 'number' && installTelemetry.lastTimestamp > 0) {
+      const deltaBytes = downloadedBytes - installTelemetry.lastBytes;
+      const deltaMs = now - installTelemetry.lastTimestamp;
+      if (deltaBytes > 0 && deltaMs > 0) {
+        const instantRate = deltaBytes / (deltaMs / 1000);
+        installTelemetry.smoothedBytesPerSecond = installTelemetry.smoothedBytesPerSecond === null
+          ? instantRate
+          : (installTelemetry.smoothedBytesPerSecond * 0.7) + (instantRate * 0.3);
+      }
+    }
+
+    installTelemetry.lastBytes = downloadedBytes;
+    installTelemetry.lastTimestamp = now;
+  }
+}
+
+function ensureWebLlmInstallListeners() {
+  if (!releaseInstallStateListener) {
+    releaseInstallStateListener = llm.onInstallStateChange(WEB_LLM_MODEL, (snapshot) => {
+      applyWebLlmInstallState(snapshot);
+      scheduleWebLlmCacheDebugRefresh(50);
+    });
+  }
+
+  llm.onStatusChange(WEB_LLM_MODEL, (status) => {
+    const progressMap = {
+      '准备缓存': 10,
+      '下载模型': 20,
+      '初始化 WASM': 55,
+      '创建推理实例': 85,
+      '开始推理': 100,
+    };
+    const installProgress = typeof latestInstallSnapshot?.progress?.percent === 'number'
+      ? latestInstallSnapshot.progress.percent
+      : null;
+    const mappedProgress = typeof status === 'string' && status.startsWith('缓存不可用')
+      ? 10
+      : progressMap[status] ?? null;
+    const progress = mappedProgress !== null && installProgress !== null
+      ? Math.max(mappedProgress, installProgress)
+      : mappedProgress;
+    setWebLlmModelStatus(status, progress);
+  });
+}
 
 function getTestItem(index) {
   return tests.find((item) => item.index === index) || null;
@@ -256,16 +346,456 @@ function waitForNextPaint() {
   });
 }
 
+function setSidebarInstallStatus(snapshot) {
+  if (!snapshot) {
+    elements.sidebarInstallStatus.classList.add('hidden');
+    return;
+  }
+
+  const shouldShow = isInstallInFlight(snapshot)
+    || snapshot.state === 'partial'
+    || snapshot.state === 'failed';
+
+  if (!shouldShow) {
+    elements.sidebarInstallStatus.classList.add('hidden');
+    return;
+  }
+
+  const summary = getInstallProgressSummary(snapshot);
+  const currentAsset = snapshot.currentAsset ? formatCurrentAssetLabel(snapshot.currentAsset) : '';
+  const text = [
+    snapshot.statusText || '等待安装',
+    isInstallInFlight(snapshot) ? summary.combinedText : '',
+    currentAsset,
+  ].filter(Boolean).join(' | ');
+
+  elements.sidebarInstallText.textContent = text;
+  elements.sidebarInstallStatus.classList.remove('hidden');
+}
+
 function setWebLlmModelStatus(text, progress = null) {
   elements.webLlmModelStatus.textContent = text;
   if (progress !== null) {
     elements.webLlmProgressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
   }
+  elements.webLlmInstallHint.textContent = formatInstallHint(latestInstallSnapshot);
 }
 
 function setWebLlmCacheDebug(summaryText, detailText) {
   elements.webLlmCacheSummary.textContent = summaryText;
   elements.webLlmCacheDetails.textContent = detailText;
+}
+
+function setWebLlmDiagnosticsExpanded(expanded) {
+  webLlmDiagnosticsExpanded = Boolean(expanded);
+  elements.webLlmDiagnosticsPanel.classList.toggle('is-collapsed', !webLlmDiagnosticsExpanded);
+  elements.webLlmDiagnosticsToggle.textContent = webLlmDiagnosticsExpanded ? '收起诊断' : '展开诊断';
+  elements.webLlmDiagnosticsToggle.setAttribute('aria-expanded', String(webLlmDiagnosticsExpanded));
+}
+
+function renderWebLlmInstallFacts(facts = []) {
+  elements.webLlmInstallFacts.replaceChildren();
+
+  for (const fact of facts) {
+    const card = document.createElement('div');
+    const label = document.createElement('div');
+    const value = document.createElement('div');
+    card.className = 'web-llm-fact-card';
+    label.className = 'label';
+    value.className = 'web-llm-fact-value';
+    label.textContent = fact.label;
+    value.textContent = fact.value;
+    card.append(label, value);
+    elements.webLlmInstallFacts.append(card);
+  }
+}
+
+function renderWebLlmAssetList(assetRows = []) {
+  elements.webLlmAssetList.replaceChildren();
+
+  if (!assetRows.length) {
+    const empty = document.createElement('div');
+    empty.className = 'web-llm-asset-empty';
+    empty.textContent = '等待安装诊断...';
+    elements.webLlmAssetList.append(empty);
+    return;
+  }
+
+  for (const rowData of assetRows) {
+    const row = document.createElement('div');
+    row.className = `web-llm-asset-row${rowData.failed ? ' is-failed' : ''}`;
+
+    const path = document.createElement('div');
+    path.className = 'web-llm-asset-path';
+    path.textContent = rowData.path;
+
+    const status = document.createElement('div');
+    status.className = 'web-llm-asset-meta';
+    status.textContent = `状态 ${rowData.status}`;
+
+    const verify = document.createElement('div');
+    verify.className = 'web-llm-asset-meta';
+    verify.textContent = `校验 ${rowData.verificationMethod}`;
+
+    const bytes = document.createElement('div');
+    bytes.className = 'web-llm-asset-meta';
+    bytes.textContent = `大小 ${rowData.sizeText}`;
+
+    const attempts = document.createElement('div');
+    attempts.className = 'web-llm-asset-meta';
+    attempts.textContent = `尝试 ${rowData.attempts}`;
+
+    const extra = document.createElement('div');
+    extra.className = 'web-llm-asset-meta';
+    extra.textContent = rowData.extra;
+
+    row.append(path, status, verify, bytes, attempts, extra);
+    elements.webLlmAssetList.append(row);
+  }
+}
+
+function formatByteCount(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return '--';
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  const units = ['KiB', 'MiB', 'GiB'];
+  let nextValue = value / 1024;
+  let unitIndex = 0;
+  while (nextValue >= 1024 && unitIndex < units.length - 1) {
+    nextValue /= 1024;
+    unitIndex += 1;
+  }
+  return `${nextValue.toFixed(nextValue >= 100 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatTransferRate(bytesPerSecond) {
+  if (typeof bytesPerSecond !== 'number' || !Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) {
+    return '--';
+  }
+
+  return `${formatByteCount(bytesPerSecond)}/s`;
+}
+
+function formatElapsedDuration(ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) {
+    return '--';
+  }
+  if (ms < 1000) {
+    return `${Math.round(ms)} ms`;
+  }
+  return `${(ms / 1000).toFixed(2)} s`;
+}
+
+function formatEta(ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) {
+    return '--';
+  }
+
+  const totalSeconds = Math.ceil(ms / 1000);
+  if (totalSeconds < 60) {
+    return `${totalSeconds} 秒`;
+  }
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return `${minutes} 分 ${seconds} 秒`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainMinutes = minutes % 60;
+  return `${hours} 小时 ${remainMinutes} 分`;
+}
+
+function formatAssetDebugPath(url) {
+  try {
+    return new URL(url, window.location.href).pathname;
+  } catch {
+    return String(url || '');
+  }
+}
+
+function formatCurrentAssetLabel(url) {
+  const path = formatAssetDebugPath(url);
+  if (!path) {
+    return '等待调度';
+  }
+
+  const fileName = path.split('/').filter(Boolean).pop() || path;
+  if (fileName.endsWith('.task')) {
+    return `正在下载模型主文件 ${fileName}`;
+  }
+
+  return `正在下载 ${fileName}`;
+}
+
+function formatInstallHint(snapshot) {
+  if (!snapshot) {
+    return '提示：关闭当前浮层不会中断后台下载。';
+  }
+
+  if (snapshot.state === 'ready' || snapshot.ready) {
+    return '提示：本地模型已就绪，后续样本会直接复用缓存。';
+  }
+
+  if (snapshot.state === 'control_waiting') {
+    return '提示：当前页面尚未被 Service Worker 控制。关闭浮层不会中断下载；刷新页面后才能完成离线安装。';
+  }
+
+  if (snapshot.state === 'downloading_model') {
+    return '提示：关闭当前浮层不会中断后台下载；如果关闭标签页、浏览器或网络/网关中断，未完成文件会重新下载。';
+  }
+
+  if (snapshot.state === 'verifying') {
+    return '提示：文件已下载完成，正在校验和初始化。当前实现不支持断点续传。';
+  }
+
+  if (snapshot.state === 'failed' && ['INSTALL_NETWORK_ERROR', 'INSTALL_ASSET_MISSING'].includes(snapshot.errorCode)) {
+    return '提示：下载已中断。当前实现不支持断点续传，重试会重新下载未完成文件。';
+  }
+
+  if (snapshot.state === 'partial' && snapshot.errorCode === 'INSTALL_CONTROL_REQUIRED') {
+    return '提示：已完成基础下载，但需要刷新页面后才能完成离线安装。';
+  }
+
+  return '提示：关闭当前浮层不会中断后台下载。';
+}
+
+function isInstallInFlight(snapshot) {
+  return ['env_checking', 'control_waiting', 'downloading_model', 'verifying'].includes(snapshot?.state);
+}
+
+function getInstallTransferMetrics(snapshot) {
+  const downloadedBytes = snapshot?.progress?.downloadedBytes;
+  const totalBytes = snapshot?.progress?.totalBytes;
+  const elapsedMs = snapshot?.startedAt ? Math.max(0, Date.now() - snapshot.startedAt) : 0;
+  const averageRate = typeof downloadedBytes === 'number' && downloadedBytes > 0 && elapsedMs > 0
+    ? downloadedBytes / (elapsedMs / 1000)
+    : null;
+  const bytesPerSecond = installTelemetry.smoothedBytesPerSecond || averageRate;
+  const remainingBytes = typeof totalBytes === 'number' && typeof downloadedBytes === 'number'
+    ? Math.max(0, totalBytes - downloadedBytes)
+    : null;
+  const etaMs = bytesPerSecond && remainingBytes !== null
+    ? (remainingBytes / bytesPerSecond) * 1000
+    : null;
+
+  return {
+    downloadedBytes,
+    totalBytes,
+    bytesPerSecond,
+    etaMs,
+  };
+}
+
+function getInstallProgressSummary(snapshot) {
+  const { downloadedBytes, totalBytes, bytesPerSecond, etaMs } = getInstallTransferMetrics(snapshot);
+  const progressText = `已下载 ${formatByteCount(downloadedBytes)} / ${formatByteCount(totalBytes)}`;
+  const speedText = bytesPerSecond ? `速度 ${formatTransferRate(bytesPerSecond)}` : '速度 --';
+  const etaText = etaMs !== null ? `预计 ${formatEta(etaMs)}` : '预计 --';
+
+  return {
+    progressText,
+    speedText,
+    etaText,
+    combinedText: `${progressText} | ${speedText} | ${etaText}`,
+  };
+}
+
+function summarizeVerificationMethods(assetRecords = []) {
+  return Array.from(new Set(
+    assetRecords
+      .map((record) => record?.verificationMethod)
+      .filter(Boolean),
+  ));
+}
+
+function resolveVerificationLabel(record, fallbackMode = '') {
+  if (record?.verificationMethod) {
+    return record.verificationMethod;
+  }
+  if (record?.verified && fallbackMode === 'size-only') {
+    return 'size-only';
+  }
+  if (record?.verified) {
+    return '缓存命中';
+  }
+  return '未记录';
+}
+
+function buildWebLlmDiagnosticsSnapshot(cacheDebug) {
+  const diagnostics = llm.getDiagnosticsSnapshot(WEB_LLM_MODEL);
+  const install = diagnostics?.install || {};
+  const progress = install?.progress || {};
+  const assetRecords = Array.isArray(install?.assetRecords) ? install.assetRecords : [];
+  const integrityMode = install.integrityMode || llm.getIntegrityMode();
+  const transfer = getInstallProgressSummary(install);
+  const verificationMethods = summarizeVerificationMethods(assetRecords);
+  const failedAssets = assetRecords
+    .filter((record) => record?.errorCode || record?.sizeMismatch || record?.hashMismatch)
+    .map((record) => ({
+      path: formatAssetDebugPath(record.url),
+      status: record.status,
+      errorCode: record.errorCode || '',
+      errorDetail: record.errorDetail || '',
+      sizeMismatch: Boolean(record.sizeMismatch),
+      hashMismatch: Boolean(record.hashMismatch),
+    }));
+
+  const assetSummary = assetRecords.map((record) => ({
+    path: formatAssetDebugPath(record.url),
+    type: record.type,
+    status: record.status,
+    verified: Boolean(record.verified),
+    attempts: record.attempts,
+    verificationMethod: record.verificationMethod || '',
+    integrityVerified: Boolean(record.integrityVerified),
+    bytes: {
+      downloaded: record.downloadedBytes ?? null,
+      observed: record.observedSizeBytes ?? null,
+      expected: record.expectedSizeBytes ?? null,
+    },
+    errorCode: record.errorCode || '',
+  }));
+
+  const installFacts = [
+    {
+      label: '安装状态',
+      value: install.statusText || install.state || '等待安装',
+    },
+    {
+      label: '完整性模式',
+      value: integrityMode,
+    },
+    {
+      label: '校验方式',
+      value: verificationMethods.join(', ') || integrityMode,
+    },
+    {
+      label: '当前资源',
+      value: formatAssetDebugPath(install.currentAsset) || '等待调度',
+    },
+    {
+      label: '文件进度',
+      value: `${progress.completedFiles ?? 0}/${progress.totalFiles ?? assetRecords.length}`,
+    },
+    {
+      label: '字节进度',
+      value: `${formatByteCount(progress.downloadedBytes)} / ${formatByteCount(progress.totalBytes)}`,
+    },
+    {
+      label: '传输速度',
+      value: transfer.speedText.replace('速度 ', ''),
+    },
+    {
+      label: '剩余预计',
+      value: transfer.etaText.replace('预计 ', ''),
+    },
+    {
+      label: '安装耗时',
+      value: formatElapsedDuration(install.durationMs),
+    },
+    {
+      label: '失败资源',
+      value: failedAssets.length > 0 ? `${failedAssets.length} 个` : '无',
+    },
+  ];
+
+  const assetRows = assetSummary.map((record) => {
+    const failed = Boolean(record.errorCode);
+    const displayedBytes = record.bytes.observed ?? record.bytes.downloaded ?? record.bytes.expected;
+    const mismatchFlags = [
+      record.integrityVerified ? 'hash-ok' : '',
+      record.errorCode ? record.errorCode : '',
+    ].filter(Boolean);
+    return {
+      path: record.path,
+      status: record.verified ? '已校验' : (record.status || 'pending'),
+      verificationMethod: resolveVerificationLabel(record, integrityMode),
+      sizeText: `${formatByteCount(displayedBytes)} / ${formatByteCount(record.bytes.expected)}`,
+      attempts: String(record.attempts ?? 0),
+      extra: mismatchFlags.join(' | ') || (record.type || ''),
+      failed,
+    };
+  });
+
+  const summary = [
+    `缓存：${cacheDebug.requestPaths.length} 条`,
+    transfer.progressText,
+    transfer.speedText,
+    transfer.etaText,
+  ].join(' | ');
+
+  return {
+    summary,
+    installFacts,
+    assetRows,
+    detail: JSON.stringify({
+      install: {
+        state: install.state,
+        statusText: install.statusText,
+        ready: Boolean(install.ready),
+        controller: Boolean(install.controller),
+        integrityMode,
+        currentAsset: formatAssetDebugPath(install.currentAsset),
+        progress: {
+          percent: progress.percent ?? null,
+          completedFiles: progress.completedFiles ?? 0,
+          totalFiles: progress.totalFiles ?? assetRecords.length,
+          downloadedBytes: formatByteCount(progress.downloadedBytes),
+          totalBytes: formatByteCount(progress.totalBytes),
+        },
+        startedAt: install.startedAt || 0,
+        completedAt: install.completedAt || 0,
+        durationMs: install.durationMs || 0,
+        retryCount: install.retryCount || 0,
+        errorCode: install.errorCode || '',
+        errorDetail: install.errorDetail || '',
+        prefetchError: install.prefetchError || '',
+        swVersion: install.swVersion || '',
+        verifiedAt: install.verifiedAt || 0,
+      },
+      runtime: diagnostics?.runtime || {},
+      manifest: {
+        modelId: diagnostics?.manifest?.modelId || WEB_LLM_MODEL,
+        version: diagnostics?.manifest?.version || '',
+        requiredAssetCount: Array.isArray(diagnostics?.manifest?.requiredAssets)
+          ? diagnostics.manifest.requiredAssets.length
+          : 0,
+      },
+      cache: {
+        cacheName: cacheDebug.cacheName,
+        controller: cacheDebug.controller,
+        controllerNote: cacheDebug.controllerNote,
+        registrations: cacheDebug.registrations,
+        cacheKeys: cacheDebug.cacheKeys,
+        cachedPaths: cacheDebug.requestPaths,
+      },
+      verificationMethods,
+      failedAssets,
+      assetSummary,
+    }, null, 2),
+  };
+}
+
+function applyWebLlmInstallState(snapshot) {
+  if (!snapshot) {
+    return;
+  }
+
+  latestInstallSnapshot = snapshot;
+  updateInstallTelemetry(snapshot);
+  const statusText = snapshot.statusText || snapshot.state || '等待安装';
+  const progress = typeof snapshot?.progress?.percent === 'number'
+    ? snapshot.progress.percent
+    : null;
+  setWebLlmModelStatus(statusText, progress);
+  setSidebarInstallStatus(snapshot);
 }
 
 function formatCacheRequestPath(url) {
@@ -278,9 +808,22 @@ function formatCacheRequestPath(url) {
 
 async function collectWebLlmCacheDebug() {
   if (!('serviceWorker' in navigator) || !('caches' in window)) {
+    const insecureContext = window.isSecureContext !== true;
     return {
-      summary: '缓存：当前浏览器不支持 Service Worker/Cache API',
-      detail: 'serviceWorker 或 caches API 不可用',
+      summary: insecureContext
+        ? '缓存：当前地址不是安全上下文，Web LLM 安装不可用'
+        : '缓存：当前浏览器不支持 Service Worker/Cache API',
+      detail: insecureContext
+        ? `当前页面地址不是安全上下文：${window.location.href}\n请改用 HTTPS 域名访问，或直接在本机使用 localhost。`
+        : 'serviceWorker 或 caches API 不可用',
+      cacheName: '',
+      controller: false,
+      controllerNote: insecureContext
+        ? '当前地址不是安全上下文，请改用 HTTPS 或 localhost'
+        : 'serviceWorker 或 caches API 不可用',
+      registrations: 0,
+      cacheKeys: [],
+      requestPaths: [],
     };
   }
 
@@ -307,7 +850,7 @@ async function collectWebLlmCacheDebug() {
   const summary = `缓存：${requestPaths.length} 条（模型 ${modelCached ? '已缓存' : '未缓存'}，WASM ${wasmCachedCount} 条）`;
   const controllerNote = navigator.serviceWorker.controller
     ? 'controller=true（当前页面已被 SW 控制）'
-    : 'controller=false（当前页面尚未被 SW 控制，但缓存仍可通过页面侧预取写入）';
+    : 'controller=false（当前页面尚未被 SW 控制，需要刷新后继续安装）';
   const detail = JSON.stringify({
     cacheName,
     controller: Boolean(navigator.serviceWorker.controller),
@@ -320,23 +863,50 @@ async function collectWebLlmCacheDebug() {
   return {
     summary,
     detail,
+    cacheName,
+    controller: Boolean(navigator.serviceWorker.controller),
+    controllerNote,
+    registrations: registrations.length,
+    cacheKeys,
+    requestPaths,
   };
 }
 
 async function refreshWebLlmCacheDebug() {
   try {
-    const debug = await collectWebLlmCacheDebug();
-    setWebLlmCacheDebug(debug.summary, debug.detail);
+    const cacheDebug = await collectWebLlmCacheDebug();
+    const diagnosticsSnapshot = buildWebLlmDiagnosticsSnapshot(cacheDebug);
+    setWebLlmCacheDebug(diagnosticsSnapshot.summary, diagnosticsSnapshot.detail);
+    renderWebLlmInstallFacts(diagnosticsSnapshot.installFacts);
+    renderWebLlmAssetList(diagnosticsSnapshot.assetRows);
   } catch (error) {
     setWebLlmCacheDebug(
       '缓存：检查失败',
       error instanceof Error ? error.message : String(error),
     );
+    renderWebLlmInstallFacts([
+      { label: '安装状态', value: '检查失败' },
+      { label: '完整性模式', value: llm.getIntegrityMode() },
+      { label: '校验方式', value: '未记录' },
+      { label: '当前资源', value: '未知' },
+      { label: '文件进度', value: '--' },
+      { label: '字节进度', value: '--' },
+      { label: '传输速度', value: '--' },
+      { label: '剩余预计', value: '--' },
+      { label: '安装耗时', value: '--' },
+      { label: '失败资源', value: '未知' },
+    ]);
+    renderWebLlmAssetList([]);
   }
 }
 
 function scheduleWebLlmCacheDebugRefresh(delayMs = 0) {
-  window.setTimeout(() => {
+  if (webLlmDebugRefreshTimer !== null) {
+    window.clearTimeout(webLlmDebugRefreshTimer);
+  }
+
+  webLlmDebugRefreshTimer = window.setTimeout(() => {
+    webLlmDebugRefreshTimer = null;
     refreshWebLlmCacheDebug();
   }, delayMs);
 }
@@ -344,6 +914,7 @@ function scheduleWebLlmCacheDebugRefresh(delayMs = 0) {
 function openWebLlmModal() {
   elements.webLlmModal.classList.remove('hidden');
   elements.webLlmModal.setAttribute('aria-hidden', 'false');
+  setWebLlmDiagnosticsExpanded(false);
 }
 
 function closeWebLlmModal() {
@@ -357,6 +928,10 @@ function closeWebLlmModal() {
     structuredTaskId: null,
     achievedTaskId: null,
   };
+  if (webLlmDebugRefreshTimer !== null) {
+    window.clearTimeout(webLlmDebugRefreshTimer);
+    webLlmDebugRefreshTimer = null;
+  }
   elements.webLlmModal.classList.add('hidden');
   elements.webLlmModal.setAttribute('aria-hidden', 'true');
   activeWebLlmIndex = null;
@@ -424,6 +999,14 @@ function setWebLlmScoreState(statusText, scoreValue = '--', reasonText = '暂无
   elements.webLlmScoreValue.textContent = scoreValue;
   elements.webLlmScoreReason.textContent = reasonText;
   elements.webLlmScoreMeta.textContent = metaText;
+}
+
+function formatWebLlmScoreMeta(scoreData) {
+  const model = scoreData?.model || 'gpt-5.4';
+  const sourceLabel = scoreData?.source === 'ollama'
+    ? 'Ollama'
+    : '服务端';
+  return `模型：${model}（${sourceLabel}）`;
 }
 
 function setAchievedDebugInfo(debugInfo) {
@@ -633,19 +1216,7 @@ async function ensureWebLlmReady() {
     return llmReadyPromise;
   }
 
-  llm.onStatusChange(WEB_LLM_MODEL, (status) => {
-    const progressMap = {
-      '准备缓存': 10,
-      '下载模型': 20,
-      '初始化 WASM': 55,
-      '创建推理实例': 85,
-      '开始推理': 100,
-    };
-    const progress = typeof status === 'string' && status.startsWith('缓存不可用')
-      ? 10
-      : progressMap[status] ?? null;
-    setWebLlmModelStatus(status, progress);
-  });
+  ensureWebLlmInstallListeners();
 
   setWebLlmModelStatus('下载模型', 20);
   llmReadyPromise = llm.load(WEB_LLM_MODEL)
@@ -655,7 +1226,13 @@ async function ensureWebLlmReady() {
     })
     .catch((error) => {
       llmReadyPromise = null;
-      setWebLlmModelStatus(error instanceof Error ? error.message : String(error));
+      const installState = llm.getInstallState(WEB_LLM_MODEL);
+      const message = error && typeof error === 'object' && 'code' in error && error.code === 'MODEL_NOT_INSTALLED'
+        ? installState.statusText || (error instanceof Error ? error.message : String(error))
+        : error instanceof Error
+          ? error.message
+          : String(error);
+      setWebLlmModelStatus(message);
       throw error;
     });
 
@@ -712,6 +1289,19 @@ async function runWebLlm(index) {
   elements.webLlmSubtitle.textContent = listItem?.name || `样本 ${index}`;
   setWebLlmScoreState('准备中', '--', '正在准备服务端评分...', '模型：gpt-5.4（服务端）');
   setWebLlmCacheDebug('缓存：检查中', '正在读取 Service Worker 与 Cache Storage 状态...');
+  renderWebLlmInstallFacts([
+    { label: '安装状态', value: '准备中' },
+    { label: '完整性模式', value: llm.getIntegrityMode() },
+    { label: '校验方式', value: '等待安装' },
+    { label: '当前资源', value: '等待调度' },
+    { label: '文件进度', value: '--' },
+    { label: '字节进度', value: '--' },
+    { label: '传输速度', value: '--' },
+    { label: '剩余预计', value: '--' },
+    { label: '安装耗时', value: '--' },
+    { label: '失败资源', value: '无' },
+  ]);
+  renderWebLlmAssetList([]);
   setWebLlmCardState('result', '准备中', '正在准备模型与样本数据...');
   elements.webLlmExpected.textContent = '正在加载预期结果...';
   setWebLlmCardState('achieved', '准备中', '正在准备模型与样本数据...');
@@ -782,7 +1372,7 @@ async function runWebLlm(index) {
           '已完成',
           summary.value,
           summary.reason,
-          `模型：${scoreData.model || 'gpt-5.4'}（服务端）`,
+          formatWebLlmScoreMeta(scoreData),
         );
       })
       .catch((error) => {
@@ -920,6 +1510,9 @@ async function rerunTest(index) {
 
 elements.webLlmClose.addEventListener('click', closeWebLlmModal);
 elements.webLlmBackdrop.addEventListener('click', closeWebLlmModal);
+elements.webLlmDiagnosticsToggle.addEventListener('click', () => {
+  setWebLlmDiagnosticsExpanded(!webLlmDiagnosticsExpanded);
+});
 elements.webLlmCacheRefresh.addEventListener('click', () => {
   refreshWebLlmCacheDebug();
 });

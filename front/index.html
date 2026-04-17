@@ -11,6 +11,10 @@
       <aside class="sidebar">
         <div class="sidebar-header">
           <h1>测试样本</h1>
+          <div id="sidebar-install-status" class="sidebar-install-status hidden">
+            <div class="sidebar-install-label">后台模型安装</div>
+            <div id="sidebar-install-text" class="sidebar-install-text">等待安装</div>
+          </div>
         </div>
         <div id="test-list" class="test-list"></div>
       </aside>
@@ -60,20 +64,35 @@
         </div>
         <div class="web-llm-body">
           <div class="web-llm-meta">
-            <div>
+            <div class="web-llm-model-panel">
               <div class="label">模型</div>
-              <div>gemma4:e2b</div>
+              <div class="web-llm-model-chip">gemma4:e2b</div>
             </div>
-            <div>
+            <div class="web-llm-status-panel">
               <div class="label">状态</div>
               <div id="web-llm-model-status" class="reason-text">等待触发加载</div>
               <div class="web-llm-cache-row">
                 <div id="web-llm-cache-summary" class="status-text web-llm-cache-summary">缓存：未检查</div>
-                <button id="web-llm-cache-refresh" type="button" class="web-llm-cache-refresh">刷新缓存状态</button>
+                <div class="web-llm-cache-actions">
+                  <button id="web-llm-diagnostics-toggle" type="button" class="web-llm-cache-refresh">展开诊断</button>
+                  <button id="web-llm-cache-refresh" type="button" class="web-llm-cache-refresh">刷新缓存状态</button>
+                </div>
               </div>
-              <pre id="web-llm-cache-details" class="web-llm-cache-details">等待检查</pre>
               <div class="web-llm-progress">
                 <div id="web-llm-progress-bar" class="web-llm-progress-bar"></div>
+              </div>
+              <div id="web-llm-install-hint" class="status-text web-llm-install-hint">提示：关闭当前浮层不会中断后台下载。</div>
+              <div id="web-llm-diagnostics-panel" class="web-llm-diagnostics-panel is-collapsed">
+                <div id="web-llm-install-facts" class="web-llm-install-facts">
+                  <div class="web-llm-fact-card">
+                    <div class="label">安装状态</div>
+                    <div class="web-llm-fact-value">等待检查</div>
+                  </div>
+                </div>
+                <div id="web-llm-asset-list" class="web-llm-asset-list">
+                  <div class="web-llm-asset-empty">等待安装诊断...</div>
+                </div>
+                <pre id="web-llm-cache-details" class="web-llm-cache-details">等待检查</pre>
               </div>
             </div>
           </div>

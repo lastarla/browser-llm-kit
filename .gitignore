@@ -4,3 +4,5 @@ dist/
 .DS_Store
 front/assets/llm/*.task
 .omx/
+.local/
+__pycache__/

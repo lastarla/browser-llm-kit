@@ -159,8 +159,8 @@ export function createTestsApi({
 
       sendJson(res, 200, {
         index,
-        model: 'gpt-5.4',
-        source: 'server',
+        model: scoreMeta.model || 'gpt-5.4',
+        source: scoreMeta.source || 'server',
         score: scoreMeta.score,
         reason: scoreMeta.reason,
         scorePayload: scoreMeta.scorePayload,

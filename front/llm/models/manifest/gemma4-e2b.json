@@ -1,0 +1,73 @@
+{
+  "modelId": "gemma4:e2b",
+  "version": "v1",
+  "runtime": {
+    "wasmBasePath": "/wasm",
+    "entryModelPath": "/assets/llm/gemma-4-E2B-it-web.task"
+  },
+  "cache": {
+    "prefix": "llm-assets",
+    "serviceWorkerUrl": "/llm-asset-sw.js",
+    "includePathPrefixes": [
+      "/wasm"
+    ]
+  },
+  "assets": [
+    {
+      "url": "/assets/llm/gemma-4-E2B-it-web.task",
+      "type": "model",
+      "required": true,
+      "installChannel": "service-worker",
+      "sizeBytes": 2003697664,
+      "sha256": "2cbff161177a4d51c9d04360016185976f504517ba5758cd10c1564e5421c5a5"
+    },
+    {
+      "url": "/wasm/genai_wasm_internal.js",
+      "type": "runtime",
+      "required": true,
+      "installChannel": "service-worker",
+      "sizeBytes": 331776,
+      "sha256": "531d78c48eb45ecd1e167cc0fcd604673d8748677061386d947f6d22e53454d2"
+    },
+    {
+      "url": "/wasm/genai_wasm_internal.wasm",
+      "type": "runtime",
+      "required": true,
+      "installChannel": "service-worker",
+      "sizeBytes": 26214400,
+      "sha256": "5e048233e783dbb97fd2c00a5a73430598f21fc0173886ab926ac535dbd24fe1"
+    },
+    {
+      "url": "/wasm/genai_wasm_module_internal.js",
+      "type": "runtime",
+      "required": true,
+      "installChannel": "service-worker",
+      "sizeBytes": 331776,
+      "sha256": "57dc0e07b1e9a60e273e22d719b5074b7542e8ffcc226f3aefd79d638ea72ecc"
+    },
+    {
+      "url": "/wasm/genai_wasm_module_internal.wasm",
+      "type": "runtime",
+      "required": true,
+      "installChannel": "service-worker",
+      "sizeBytes": 26214400,
+      "sha256": "d7794834030168f312299d04d50a4533ff29484a85b60df452549cc1238c07d6"
+    },
+    {
+      "url": "/wasm/genai_wasm_nosimd_internal.js",
+      "type": "runtime",
+      "required": true,
+      "installChannel": "service-worker",
+      "sizeBytes": 331776,
+      "sha256": "1bac016de0b78c61c488f6f5080c0ae897bdc6b7d85d573e275ad8c9ce091ac7"
+    },
+    {
+      "url": "/wasm/genai_wasm_nosimd_internal.wasm",
+      "type": "runtime",
+      "required": true,
+      "installChannel": "service-worker",
+      "sizeBytes": 26109542,
+      "sha256": "efc79943cd6e3097012595dabf8cf897da5d6c82fc4c01af63ba51e15809cb60"
+    }
+  ]
+}

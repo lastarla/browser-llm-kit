@@ -4,9 +4,12 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
+    "start:https": "PORT=3443 HTTPS_KEY_FILE=.local/certs/gemma4-preview-key.pem HTTPS_CERT_FILE=.local/certs/gemma4-preview.pem node server/index.js",
     "build": "webpack --config webpack.config.cjs",
     "test": "node --test test/*.test.js",
-    "verify": "npm test && npm run build"
+    "verify": "npm test && npm run build",
+    "benchmark:task-integrity": "node scripts/benchmark-task-integrity.mjs",
+    "verify:browser-sw": "python3 scripts/verify_sw_install.py"
   },
   "dependencies": {
     "@mediapipe/tasks-genai": "^0.10.27"
