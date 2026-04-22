@@ -3,7 +3,7 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const PROJECT_ROOT = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_TEST_STORE_PATH = path.resolve(PROJECT_ROOT, 'config/tests.json');
+const DEFAULT_TEST_STORE_PATH = path.resolve(PROJECT_ROOT, 'fixtures/tests.json');
 
 async function fileExists(filePath) {
   try {

@@ -66,7 +66,9 @@ npm run start:https
 - `examples/meeting-notes-demo`：示例宿主
   - `web/`：浏览器宿主
   - `server/`：Node 示例服务
-  - `shared/`：样本、模板和提示词
+  - `shared/fixtures/`：示例模板和样本数据
+  - `shared/prompts/`：提示词
+  - `shared/`：共享 helper
 
 ## Docs
 
@@ -83,9 +85,9 @@ npm run start:https
 - 示例宿主
 - 集成与架构文档
 - `CONTRIBUTING.md`
+- `CODE_OF_CONDUCT.md`
 - `SECURITY.md`
-
-仍需项目所有者明确的一项是许可证选型；当前仓库尚未添加 `LICENSE` 文件。
+- `LICENSE` (`MIT`)
 
 ## 处理链路
 
@@ -162,7 +164,7 @@ curl -X POST http://localhost:3001/ask \
 
 ### 3. `POST /run-tests`
 
-按样本执行生成，并把生成结果写回 `examples/meeting-notes-demo/shared/config/tests.json` 的 `result` 字段。
+按样本执行生成，并把生成结果写回 `examples/meeting-notes-demo/shared/fixtures/tests.json` 的 `result` 字段。
 
 **请求体字段：**
 
@@ -219,7 +221,7 @@ curl -X POST http://localhost:3001/run-tests \
 
 ### 4. `POST /score-tests`
 
-按样本对已有 `result` 进行评分，并把评分接口返回的完整结构化 JSON 写回 `examples/meeting-notes-demo/shared/config/tests.json` 的 `score` 字段。
+按样本对已有 `result` 进行评分，并把评分接口返回的完整结构化 JSON 写回 `examples/meeting-notes-demo/shared/fixtures/tests.json` 的 `score` 字段。
 
 **请求体字段：**
 
@@ -283,7 +285,7 @@ curl -X POST http://localhost:3001/score-tests \
 
 ### 5. `POST /run-and-score-tests`
 
-先执行生成，再立即评分，并把 `result` 与 `score` 一并写回 `examples/meeting-notes-demo/shared/config/tests.json`。
+先执行生成，再立即评分，并把 `result` 与 `score` 一并写回 `examples/meeting-notes-demo/shared/fixtures/tests.json`。
 
 **请求体字段：**
 
@@ -336,7 +338,7 @@ curl -X POST http://localhost:3001/run-and-score-tests \
 
 ## 测试数据回写说明
 
-测试样本位于 [`examples/meeting-notes-demo/shared/config/tests.json`](examples/meeting-notes-demo/shared/config/tests.json)。
+测试样本位于 [`examples/meeting-notes-demo/shared/fixtures/tests.json`](examples/meeting-notes-demo/shared/fixtures/tests.json)。
 
 - `POST /run-tests`：更新 `result`
 - `POST /score-tests`：更新 `score`

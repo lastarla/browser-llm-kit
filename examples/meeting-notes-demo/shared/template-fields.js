@@ -1,4 +1,4 @@
-import template from './config/template.js';
+import template from './fixtures/template.js';
 
 export function normalizeHeadingTitle(title) {
   return title

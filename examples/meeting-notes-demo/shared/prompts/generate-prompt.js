@@ -1,4 +1,4 @@
-import template from '../config/template.js';
+import template from '../fixtures/template.js';
 import { buildTemplateFieldTitles } from '../template-fields.js';
 
 const escapeJsonString = (value) => JSON.stringify(value ?? '').slice(1, -1);

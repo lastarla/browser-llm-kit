@@ -3,6 +3,31 @@
   "private": false,
   "description": "Browser-side LLM toolkit with OPFS + Worker architecture and example hosts",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lastarla/browser-llm-kit.git"
+  },
+  "homepage": "https://github.com/lastarla/browser-llm-kit",
+  "bugs": {
+    "url": "https://github.com/lastarla/browser-llm-kit/issues"
+  },
+  "keywords": [
+    "browser-llm",
+    "opfs",
+    "web-llm",
+    "worker",
+    "mediapipe",
+    "local-llm"
+  ],
+  "files": [
+    "packages/",
+    "examples/",
+    "docs/",
+    "README.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    "SECURITY.md"
+  ],
   "type": "module",
   "scripts": {
     "start": "node examples/meeting-notes-demo/server/index.js",

@@ -15,7 +15,9 @@ It provides:
 
 - `web/` - browser entry pages and styles
 - `server/` - Node example server
-- `shared/` - prompt templates, sample data, and shared helpers
+- `shared/fixtures/` - sample data and templates
+- `shared/prompts/` - prompt templates
+- `shared/` - shared helpers
 
 ## Run
 
