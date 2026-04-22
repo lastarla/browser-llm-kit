@@ -25,6 +25,14 @@ It provides:
 npm start
 ```
 
+Before using the browser-side local model install flow, place the model file at:
+
+```text
+examples/meeting-notes-demo/web/assets/llm/gemma-4-E2B-it-web.task
+```
+
+That path is intentionally gitignored so the example can run with a locally provisioned model without checking a multi-GB asset into the repository.
+
 Open:
 
 - `http://localhost:3001/`

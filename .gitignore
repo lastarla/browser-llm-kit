@@ -3,6 +3,7 @@ dist/
 .omc/
 .DS_Store
 front/assets/llm/*.task
+examples/meeting-notes-demo/web/assets/llm/*.task
 .omx/
 .local/
 __pycache__/

@@ -26,6 +26,14 @@ npm run start:https
 
 构建默认只产出 example 宿主前端代码、样式和 WASM，不再把 1.9G 模型文件复制到 `dist/`。运行时由 example 服务端直接从 `examples/meeting-notes-demo/web/assets` 提供模型资源。
 
+仓库默认不提交示例宿主使用的 `.task` 模型文件。启动浏览器侧推理前，需要你自行把模型文件放到：
+
+```text
+examples/meeting-notes-demo/web/assets/llm/gemma-4-E2B-it-web.task
+```
+
+该路径已加入 `.gitignore`，用于避免把本地大文件再次提交进仓库历史。
+
 如果你确实需要把模型一起复制进构建产物，可以显式开启：
 
 ```bash
@@ -65,6 +73,7 @@ npm run start:https
 - `packages/llm-mediapipe`：MediaPipe 运行时适配层
 - `examples/meeting-notes-demo`：示例宿主
   - `web/`：浏览器宿主
+    - `assets/llm/`：本地自备模型文件目录（默认不纳入版本控制）
   - `server/`：Node 示例服务
   - `shared/fixtures/`：示例模板和样本数据
   - `shared/prompts/`：提示词
