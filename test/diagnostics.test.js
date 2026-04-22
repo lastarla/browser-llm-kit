@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getInstallProgress } from '../front/llm/diagnostics.js';
+import { getInstallProgress } from '../packages/llm-core/index.js';
 
 test('getInstallProgress prefers byte progress when totals are known', () => {
   const percent = getInstallProgress({

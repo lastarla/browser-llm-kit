@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
-const DEFAULT_FILE = path.resolve('front/assets/llm/gemma-4-E2B-it-web.task');
+const DEFAULT_FILE = path.resolve('examples/meeting-notes-demo/web/assets/llm/gemma-4-E2B-it-web.task');
 const CHUNK_SIZE = 1024 * 1024;
 const SHA256_K = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,

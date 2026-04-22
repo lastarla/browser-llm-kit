@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Browser LLM SDK Host</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="sdk-host-layout">
+      <section class="card sdk-host-hero">
+        <div class="sdk-host-header">
+          <div>
+            <div class="label">Second Host Validation</div>
+            <h1>BrowserLLMService 独立宿主验证页</h1>
+            <p class="sdk-host-copy">
+              这个页面不依赖测试样本列表，只通过包式入口接入同一个 BrowserLLMService，
+              用来验证第二宿主的模型列表、能力探测、状态查询和诊断能力。
+            </p>
+          </div>
+          <div class="sdk-host-actions">
+            <button id="sdk-refresh" type="button" class="web-llm-button">刷新快照</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="sdk-host-grid">
+        <article class="card">
+          <div class="card-header">
+            <h2>模型列表</h2>
+            <span id="sdk-model-count" class="status-text">--</span>
+          </div>
+          <pre id="sdk-models" class="content-text">等待加载...</pre>
+        </article>
+
+        <article class="card">
+          <div class="card-header">
+            <h2>Eligibility</h2>
+            <span id="sdk-eligibility-status" class="status-text">--</span>
+          </div>
+          <pre id="sdk-eligibility" class="content-text">等待加载...</pre>
+        </article>
+
+        <article class="card">
+          <div class="card-header">
+            <h2>模型状态</h2>
+            <span id="sdk-model-status-summary" class="status-text">--</span>
+          </div>
+          <pre id="sdk-model-status" class="content-text">等待加载...</pre>
+        </article>
+
+        <article class="card">
+          <div class="card-header">
+            <h2>诊断快照</h2>
+            <span id="sdk-diagnostics-status" class="status-text">--</span>
+          </div>
+          <pre id="sdk-diagnostics" class="content-text">等待加载...</pre>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="/sdk-host.js"></script>
+  </body>
+</html>

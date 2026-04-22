@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { Readable, Writable } from 'node:stream';
 import { once } from 'node:events';
 import { pathToFileURL } from 'node:url';
-import { createRequestHandler, resolveServerRuntimeOptions } from '../server/index.js';
+import { createRequestHandler, resolveServerRuntimeOptions } from '../examples/meeting-notes-demo/server/index.js';
 
 function createMemoryStore(seedTests) {
   let tests = structuredClone(seedTests);
@@ -54,11 +54,14 @@ function createMemoryStore(seedTests) {
   };
 }
 
-async function performRequest(handler, { method, url, body = null }) {
+async function performRequest(handler, { method, url, body = null, headers: extraHeaders = {} }) {
   const req = Readable.from(body ? [Buffer.from(JSON.stringify(body))] : []);
   req.method = method;
   req.url = url;
-  req.headers = body ? { 'content-type': 'application/json' } : {};
+  req.headers = {
+    ...(body ? { 'content-type': 'application/json' } : {}),
+    ...extraHeaders,
+  };
 
   const chunks = [];
   let statusCode = 200;
@@ -153,7 +156,7 @@ test('GET /tests/:id stays read-only and POST /tests/:id/ensure performs the exp
   assert.equal(ensureCalls, 1);
 });
 
-test('static asset requests fall back to front/assets when dist asset is absent', async (t) => {
+test('static asset requests fall back to example web assets when dist asset is absent', async (t) => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gemma4-static-'));
   const distDir = path.join(tempDir, 'dist-front');
   const sourceDir = path.join(tempDir, 'front-src');
@@ -181,6 +184,100 @@ test('static asset requests fall back to front/assets when dist asset is absent'
   assert.equal(response.statusCode, 200);
   assert.equal(response.body, 'model-bytes');
   assert.equal(response.headers['Cache-Control'], 'public, max-age=31536000, immutable');
+});
+
+test('HEAD static asset requests return metadata without requiring a response body', async (t) => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gemma4-static-head-'));
+  const distDir = path.join(tempDir, 'dist-front');
+  const sourceDir = path.join(tempDir, 'front-src');
+  const assetRelativePath = path.join('assets', 'llm', 'demo.task');
+
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  await mkdir(distDir, { recursive: true });
+  await mkdir(path.join(sourceDir, 'assets', 'llm'), { recursive: true });
+  await writeFile(path.join(sourceDir, assetRelativePath), 'model-bytes', 'utf8');
+
+  const handler = createRequestHandler({
+    distFrontDir: pathToFileURL(`${distDir}/`),
+    sourceFrontDir: pathToFileURL(`${sourceDir}/`),
+    testStore: createMemoryStore([]),
+  });
+
+  const response = await performRequest(handler, {
+    method: 'HEAD',
+    url: '/assets/llm/demo.task',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body, '');
+  assert.equal(response.headers['Content-Length'], String(Buffer.byteLength('model-bytes')));
+  assert.equal(response.headers['Accept-Ranges'], 'bytes');
+  assert.equal(response.headers['Cache-Control'], 'public, max-age=31536000, immutable');
+});
+
+test('secondary sdk host page is served as a standalone entry', async (t) => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gemma4-sdk-host-'));
+  const distDir = path.join(tempDir, 'dist-front');
+  const sourceDir = path.join(tempDir, 'front-src');
+
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  await mkdir(distDir, { recursive: true });
+  await mkdir(sourceDir, { recursive: true });
+  await writeFile(path.join(distDir, 'sdk-host.html'), '<!doctype html><title>sdk host</title>', 'utf8');
+
+  const handler = createRequestHandler({
+    distFrontDir: pathToFileURL(`${distDir}/`),
+    sourceFrontDir: pathToFileURL(`${sourceDir}/`),
+    testStore: createMemoryStore([]),
+  });
+
+  const response = await performRequest(handler, {
+    method: 'GET',
+    url: '/sdk-host.html',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /sdk host/);
+});
+
+test('static asset requests honor byte ranges for resumable downloads', async (t) => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gemma4-static-range-'));
+  const distDir = path.join(tempDir, 'dist-front');
+  const sourceDir = path.join(tempDir, 'front-src');
+  const assetRelativePath = path.join('assets', 'llm', 'demo.task');
+
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  await mkdir(distDir, { recursive: true });
+  await mkdir(path.join(sourceDir, 'assets', 'llm'), { recursive: true });
+  await writeFile(path.join(sourceDir, assetRelativePath), 'abcdefghij', 'utf8');
+
+  const handler = createRequestHandler({
+    distFrontDir: pathToFileURL(`${distDir}/`),
+    sourceFrontDir: pathToFileURL(`${sourceDir}/`),
+    testStore: createMemoryStore([]),
+  });
+
+  const response = await performRequest(handler, {
+    method: 'GET',
+    url: '/assets/llm/demo.task',
+    headers: {
+      range: 'bytes=3-6',
+    },
+  });
+
+  assert.equal(response.statusCode, 206);
+  assert.equal(response.body, 'defg');
+  assert.equal(response.headers['Content-Range'], 'bytes 3-6/10');
+  assert.equal(response.headers['Accept-Ranges'], 'bytes');
 });
 
 test('POST /tests/:id/web-llm-score returns score source and model from scoring backend', async () => {

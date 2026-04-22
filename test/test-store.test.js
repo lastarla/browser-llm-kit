@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { createTestStore } from '../test-store.js';
+import { createTestStore } from '../examples/meeting-notes-demo/shared/test-store.js';
 
 test('createTestStore updates a json-backed store in place', async (t) => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gemma4-store-'));

@@ -1,6 +1,14 @@
-# gemma4
+# browser-llm-kit
 
-用于本地调用 Ollama 生成结构化会议纪要，并对测试样本执行批量生成、评分与结果回写。
+浏览器端 LLM 工具包，采用 `packages/* + OPFS + Worker` 架构，并附带一个会议纪要 demo 宿主用于演示接入方式。
+
+## Status
+
+当前仓库包含：
+
+- 可复用包：`packages/*`
+- 示例宿主：`examples/meeting-notes-demo`
+- 文档入口：[`docs/README.md`](docs/README.md)
 
 ## 启动
 
@@ -8,7 +16,7 @@
 npm start
 ```
 
-默认监听 `http://localhost:3001`。
+默认启动会议纪要 demo 宿主，监听 `http://localhost:3001`。
 
 如果要让浏览器里的 `Web LLM` 在局域网地址下正常工作，需要 HTTPS。现在服务端可直接读取证书启动原生 HTTPS：
 
@@ -16,7 +24,7 @@ npm start
 npm run start:https
 ```
 
-构建默认只产出前端代码、样式、SW 和 WASM，不再把 1.9G 模型文件复制到 `dist/`。运行时由服务端直接从 `front/assets` 提供模型资源。
+构建默认只产出 example 宿主前端代码、样式和 WASM，不再把 1.9G 模型文件复制到 `dist/`。运行时由 example 服务端直接从 `examples/meeting-notes-demo/web/assets` 提供模型资源。
 
 如果你确实需要把模型一起复制进构建产物，可以显式开启：
 
@@ -47,6 +55,37 @@ npm run start:https
 ```
 
 它等价于使用 `.local/certs/gemma4-preview-key.pem` 和 `.local/certs/gemma4-preview.pem` 在 `3443` 端口启动原生 HTTPS 服务。
+
+## 仓库结构
+
+- `packages/llm-browser`：浏览器侧入口
+- `packages/llm-core`：核心协调层
+- `packages/llm-opfs`：安装与 OPFS 存储层
+- `packages/llm-worker`：worker client 与 worker 实现
+- `packages/llm-mediapipe`：MediaPipe 运行时适配层
+- `examples/meeting-notes-demo`：示例宿主
+  - `web/`：浏览器宿主
+  - `server/`：Node 示例服务
+  - `shared/`：样本、模板和提示词
+
+## Docs
+
+- [`docs/README.md`](docs/README.md)
+- [`docs/guides/browser-llm-service-integration.md`](docs/guides/browser-llm-service-integration.md)
+- [`docs/architecture/browser-llm-service.md`](docs/architecture/browser-llm-service.md)
+- [`examples/meeting-notes-demo/README.md`](examples/meeting-notes-demo/README.md)
+
+## Open Source Readiness
+
+已补齐：
+
+- 包边界
+- 示例宿主
+- 集成与架构文档
+- `CONTRIBUTING.md`
+- `SECURITY.md`
+
+仍需项目所有者明确的一项是许可证选型；当前仓库尚未添加 `LICENSE` 文件。
 
 ## 处理链路
 
@@ -123,7 +162,7 @@ curl -X POST http://localhost:3001/ask \
 
 ### 3. `POST /run-tests`
 
-按样本执行生成，并把生成结果写回 `config/tests.json` 的 `result` 字段。
+按样本执行生成，并把生成结果写回 `examples/meeting-notes-demo/shared/config/tests.json` 的 `result` 字段。
 
 **请求体字段：**
 
@@ -180,7 +219,7 @@ curl -X POST http://localhost:3001/run-tests \
 
 ### 4. `POST /score-tests`
 
-按样本对已有 `result` 进行评分，并把评分接口返回的完整结构化 JSON 写回 `config/tests.json` 的 `score` 字段。
+按样本对已有 `result` 进行评分，并把评分接口返回的完整结构化 JSON 写回 `examples/meeting-notes-demo/shared/config/tests.json` 的 `score` 字段。
 
 **请求体字段：**
 
@@ -244,7 +283,7 @@ curl -X POST http://localhost:3001/score-tests \
 
 ### 5. `POST /run-and-score-tests`
 
-先执行生成，再立即评分，并把 `result` 与 `score` 一并写回 `config/tests.json`。
+先执行生成，再立即评分，并把 `result` 与 `score` 一并写回 `examples/meeting-notes-demo/shared/config/tests.json`。
 
 **请求体字段：**
 
@@ -297,7 +336,7 @@ curl -X POST http://localhost:3001/run-and-score-tests \
 
 ## 测试数据回写说明
 
-测试样本位于 [config/tests.json](config/tests.json)。
+测试样本位于 [`examples/meeting-notes-demo/shared/config/tests.json`](examples/meeting-notes-demo/shared/config/tests.json)。
 
 - `POST /run-tests`：更新 `result`
 - `POST /score-tests`：更新 `score`

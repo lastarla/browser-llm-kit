@@ -5,7 +5,7 @@ import {
   extractScoreDetails,
   parseScoreResponse,
   scoreSample,
-} from '../server/services/score-service.js';
+} from '../examples/meeting-notes-demo/server/services/score-service.js';
 
 test('parseScoreResponse accepts fenced json content', () => {
   const parsed = parseScoreResponse('```json\n{"score": 96, "reason": "ok"}\n```');
