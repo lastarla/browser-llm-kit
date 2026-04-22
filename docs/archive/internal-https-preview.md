@@ -2,15 +2,15 @@
 
 目标：让 `Web LLM` 在内网环境下也能运行新的 `OPFS + Worker` 本地模型链路，并真实测试 1.9G 模型下载、安装和复用体验。
 
-## 当前机器信息
+## 示例机器信息
 
-- 局域网 IP：`172.28.1.16`
-- Bonjour 主机名：`leondeMacBook-Pro.local`
-- Node 服务地址：`http://172.28.1.16:3001/`
+- 局域网 IP：`192.168.1.20`
+- Bonjour 主机名：`dev-machine.local`
+- Node 服务地址：`http://192.168.1.20:3001/`
 
 ## 限制
 
-- `http://172.28.1.16:3001/` 只能看页面，不能稳定测试新的浏览器端模型安装链路
+- `http://192.168.1.20:3001/` 只能看页面，不能稳定测试新的浏览器端模型安装链路
 - 原因是浏览器不会把局域网 IP 的纯 HTTP 页面当作安全上下文
 - 真实 Web LLM 测试必须走 HTTPS 或本机 `localhost`，否则 `Worker + OPFS` 相关能力不完整
 
@@ -28,23 +28,23 @@ mkcert -install
 ```bash
 mkdir -p .local/certs
 mkcert \
-  -cert-file .local/certs/gemma4-preview.pem \
-  -key-file .local/certs/gemma4-preview-key.pem \
-  gemma4.test \
-  172.28.1.16 \
-  leondeMacBook-Pro.local \
+  -cert-file .local/certs/browser-llm-kit-preview.pem \
+  -key-file .local/certs/browser-llm-kit-preview-key.pem \
+  browser-llm-kit.test \
+  192.168.1.20 \
+  dev-machine.local \
   localhost \
   127.0.0.1
 ```
 
 ## 3. 给测试机配置 hosts（可选）
 
-由于证书里已经包含 `172.28.1.16`，直接访问 IP 也可以，不一定非要改 hosts。
+由于证书里已经包含 `192.168.1.20`，直接访问 IP 也可以，不一定非要改 hosts。
 
 如果你想给体验链接起一个固定名字，再让每台测试机加一条 hosts：
 
 ```text
-172.28.1.16 gemma4.test
+192.168.1.20 browser-llm-kit.test
 ```
 
 macOS/Linux：`/etc/hosts`
@@ -68,13 +68,13 @@ npm run start:https
 最省事的地址是：
 
 ```text
-https://172.28.1.16:3443/
+https://192.168.1.20:3443/
 ```
 
 如果测试机已经配置了 hosts，并且想用固定名字，也可以用：
 
 ```text
-https://gemma4.test:3443/
+https://browser-llm-kit.test:3443/
 ```
 
 如果只在当前机器自己测试，也可以直接用：
@@ -120,7 +120,7 @@ caddy run --config ./examples/meeting-notes-demo/Caddyfile.internal
 11. 把“使用此证书时”从“使用系统默认值”改成“始终信任”
 12. 关闭证书详情窗口，系统通常会再次要求输入 macOS 登录密码，这是正常现象，输完即可保存
 13. 回到“钥匙串访问”，确认这张证书还在“系统”钥匙串里，并且没有明显的红色信任警告
-14. 重新打开浏览器，访问 `https://172.28.1.16:3443/`
+14. 重新打开浏览器，访问 `https://192.168.1.20:3443/`
 
 如果双击 `rootCA.pem` 之后没有打开“钥匙串访问”，而是被别的程序打开了：
 
@@ -132,7 +132,7 @@ caddy run --config ./examples/meeting-notes-demo/Caddyfile.internal
 
 安装完成后，可以这样快速确认是否成功：
 
-1. 用浏览器打开 `https://172.28.1.16:3443/`
+1. 用浏览器打开 `https://192.168.1.20:3443/`
 2. 地址栏不应该再出现明显的“不安全”提示
 3. 点击页面里的 `Web LLM` 功能时，不应该再因为 HTTPS / 证书问题被浏览器拦住
 
@@ -152,7 +152,7 @@ caddy run --config ./examples/meeting-notes-demo/Caddyfile.internal
 请大家帮忙体验一下浏览器运行 gemma4 模型，这次主要测试新的 Web LLM 本地模型链路，关注首次下载、安装和二次复用体验，模型文件约 1.9G。
 
 体验地址：
-https://172.28.1.16:3443/
+https://192.168.1.20:3443/
 
 第一次访问前，需要先信任测试证书。
 我会把根证书文件单独发给大家，文件名是 rootCA.pem。
@@ -199,7 +199,7 @@ Windows：
 
 装完证书后：
 1. 重新打开浏览器
-2. 访问 https://172.28.1.16:3443/
+2. 访问 https://192.168.1.20:3443/
 3. 点击左侧任意样本的 Web LLM
 4. 观察首次下载、安装进度、首次可用时间和是否成功进入可用状态
 

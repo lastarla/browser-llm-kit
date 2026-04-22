@@ -31,7 +31,7 @@
   "type": "module",
   "scripts": {
     "start": "node examples/meeting-notes-demo/server/index.js",
-    "start:https": "PORT=3443 HTTPS_KEY_FILE=.local/certs/gemma4-preview-key.pem HTTPS_CERT_FILE=.local/certs/gemma4-preview.pem node examples/meeting-notes-demo/server/index.js",
+    "start:https": "PORT=3443 HTTPS_KEY_FILE=.local/certs/browser-llm-kit-preview-key.pem HTTPS_CERT_FILE=.local/certs/browser-llm-kit-preview.pem node examples/meeting-notes-demo/server/index.js",
     "build": "webpack --config webpack.config.cjs",
     "test": "node --test test/*.test.js",
     "verify": "npm test && npm run build",

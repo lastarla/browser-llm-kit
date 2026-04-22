@@ -319,20 +319,20 @@ test('POST /tests/:id/web-llm-score returns score source and model from scoring 
 test('resolveServerRuntimeOptions enables https when both cert paths are configured', () => {
   const runtimeOptions = resolveServerRuntimeOptions({
     port: 3443,
-    httpsKeyFile: '/tmp/gemma4-preview.key',
-    httpsCertFile: '/tmp/gemma4-preview.crt',
+    httpsKeyFile: '/tmp/browser-llm-kit-preview.key',
+    httpsCertFile: '/tmp/browser-llm-kit-preview.crt',
   });
 
   assert.equal(runtimeOptions.port, 3443);
   assert.equal(runtimeOptions.protocol, 'https');
-  assert.equal(runtimeOptions.httpsKeyFile, '/tmp/gemma4-preview.key');
-  assert.equal(runtimeOptions.httpsCertFile, '/tmp/gemma4-preview.crt');
+  assert.equal(runtimeOptions.httpsKeyFile, '/tmp/browser-llm-kit-preview.key');
+  assert.equal(runtimeOptions.httpsCertFile, '/tmp/browser-llm-kit-preview.crt');
 });
 
 test('resolveServerRuntimeOptions rejects incomplete https config', () => {
   assert.throws(
     () => resolveServerRuntimeOptions({
-      httpsKeyFile: '/tmp/gemma4-preview.key',
+      httpsKeyFile: '/tmp/browser-llm-kit-preview.key',
     }),
     /HTTPS_CERT_CONFIG_INVALID/,
   );

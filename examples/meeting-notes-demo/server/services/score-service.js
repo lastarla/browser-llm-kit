@@ -1,15 +1,19 @@
 import { DEFAULT_MODEL, askOllama } from './generate-service.js';
 
 function getScoreApiBaseUrl() {
-  return process.env.ANTHROPIC_BASE_URL?.trim() || 'https://aihub.firstshare.cn';
+  return (
+    process.env.SCORE_API_BASE_URL?.trim()
+    || process.env.ANTHROPIC_BASE_URL?.trim()
+    || 'https://api.openai.com'
+  );
 }
 
 function getScoreApiToken() {
-  return process.env.ANTHROPIC_AUTH_TOKEN?.trim() || '';
+  return process.env.SCORE_API_AUTH_TOKEN?.trim() || process.env.ANTHROPIC_AUTH_TOKEN?.trim() || '';
 }
 
 function getScoreModel() {
-  return 'gpt-5.4';
+  return process.env.SCORE_API_MODEL?.trim() || 'gpt-5.4';
 }
 
 export function extractTextFromScoreResponse(data) {

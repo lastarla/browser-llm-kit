@@ -33,7 +33,7 @@ function installBrowserEnvironment(t, {
     value: {
       isSecureContext: secure,
       location: {
-        href: secure ? 'https://example.test/' : 'http://172.28.1.16:3001/',
+        href: secure ? 'https://example.test/' : 'http://192.168.1.20:3001/',
       },
       setTimeout: globalThis.setTimeout,
       clearTimeout: globalThis.clearTimeout,

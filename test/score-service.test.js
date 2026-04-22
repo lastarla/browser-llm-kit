@@ -42,10 +42,10 @@ test('buildScorePrompt replaces both expected placeholders', () => {
 });
 
 test('scoreSample falls back to Ollama scoring when score API token is missing', async (t) => {
-  const originalToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  const originalToken = process.env.SCORE_API_AUTH_TOKEN;
   const originalFetch = globalThis.fetch;
 
-  process.env.ANTHROPIC_AUTH_TOKEN = '';
+  process.env.SCORE_API_AUTH_TOKEN = '';
   globalThis.fetch = async (url, options) => {
     assert.equal(url, 'http://localhost:11434/api/generate');
     const payload = JSON.parse(String(options?.body || '{}'));
@@ -61,7 +61,7 @@ test('scoreSample falls back to Ollama scoring when score API token is missing',
   };
 
   t.after(() => {
-    process.env.ANTHROPIC_AUTH_TOKEN = originalToken;
+    process.env.SCORE_API_AUTH_TOKEN = originalToken;
     globalThis.fetch = originalFetch;
   });
 

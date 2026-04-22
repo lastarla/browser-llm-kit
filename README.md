@@ -53,8 +53,11 @@ npm test
 - `HTTPS_CERT_FILE`：可选，HTTPS 证书文件路径；与 `HTTPS_KEY_FILE` 必须同时提供
 - `OLLAMA_HOST`：本地 Ollama 地址，默认 `http://localhost:11434`
 - `OLLAMA_MODEL`：生成模型，默认 `gemma4:e2b`
-- `ANTHROPIC_BASE_URL`：评分接口基础地址，默认 `https://aihub.firstshare.cn`
-- `ANTHROPIC_AUTH_TOKEN`：评分接口 Bearer Token
+- `SCORE_API_BASE_URL`：可选，评分接口基础地址，默认 `https://api.openai.com`
+- `SCORE_API_AUTH_TOKEN`：可选，评分接口 Bearer Token
+- `SCORE_API_MODEL`：可选，评分模型，默认 `gpt-5.4`
+- `ANTHROPIC_BASE_URL`：旧兼容变量，仍可作为 `SCORE_API_BASE_URL` 的回退
+- `ANTHROPIC_AUTH_TOKEN`：旧兼容变量，仍可作为 `SCORE_API_AUTH_TOKEN` 的回退
 
 为了本机内网体验方便，仓库还提供了一个固定脚本：
 
@@ -62,7 +65,7 @@ npm test
 npm run start:https
 ```
 
-它等价于使用 `.local/certs/gemma4-preview-key.pem` 和 `.local/certs/gemma4-preview.pem` 在 `3443` 端口启动原生 HTTPS 服务。
+它等价于使用 `.local/certs/browser-llm-kit-preview-key.pem` 和 `.local/certs/browser-llm-kit-preview.pem` 在 `3443` 端口启动原生 HTTPS 服务。
 
 ## 仓库结构
 
