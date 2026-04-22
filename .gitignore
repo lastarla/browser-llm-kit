@@ -4,6 +4,7 @@ dist/
 .DS_Store
 front/assets/llm/*.task
 examples/meeting-notes-demo/web/assets/llm/*.task
+examples/meeting-notes-demo/shared/fixtures/tests.json
 .omx/
 .local/
 __pycache__/
