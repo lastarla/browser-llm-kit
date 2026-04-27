@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatSample } from '../server/services/format-service.js';
+import { formatSample } from '../examples/meeting-notes-demo/server/services/format-service.js';
 
 test('formatSample extracts template fields from markdown output', () => {
   const result = formatSample(`

@@ -1,0 +1,9 @@
+{
+	admin off
+}
+
+:3443 {
+	tls ./.local/certs/browser-llm-kit-preview.pem ./.local/certs/browser-llm-kit-preview-key.pem
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3001
+}

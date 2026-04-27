@@ -1,6 +1,14 @@
-# gemma4
+# browser-llm-kit
 
-用于本地调用 Ollama 生成结构化会议纪要，并对测试样本执行批量生成、评分与结果回写。
+浏览器端 LLM 工具包，采用 `packages/* + OPFS + Worker` 架构，并附带一个会议纪要 demo 宿主用于演示接入方式。
+
+## Status
+
+当前仓库包含：
+
+- 可复用包：`packages/*`
+- 示例宿主：`examples/meeting-notes-demo`
+- 文档入口：[`docs/README.md`](docs/README.md)
 
 ## 启动
 
@@ -8,7 +16,7 @@
 npm start
 ```
 
-默认监听 `http://localhost:3001`。
+默认启动会议纪要 demo 宿主，监听 `http://localhost:3001`。
 
 如果要让浏览器里的 `Web LLM` 在局域网地址下正常工作，需要 HTTPS。现在服务端可直接读取证书启动原生 HTTPS：
 
@@ -16,7 +24,15 @@ npm start
 npm run start:https
 ```
 
-构建默认只产出前端代码、样式、SW 和 WASM，不再把 1.9G 模型文件复制到 `dist/`。运行时由服务端直接从 `front/assets` 提供模型资源。
+构建默认只产出 example 宿主前端代码、样式和 WASM，不再把 1.9G 模型文件复制到 `dist/`。运行时由 example 服务端直接从 `examples/meeting-notes-demo/web/assets` 提供模型资源。
+
+仓库默认不提交示例宿主使用的 `.task` 模型文件。启动浏览器侧推理前，需要你自行把模型文件放到：
+
+```text
+examples/meeting-notes-demo/web/assets/llm/gemma-4-E2B-it-web.task
+```
+
+该路径已加入 `.gitignore`，用于避免把本地大文件再次提交进仓库历史。
 
 如果你确实需要把模型一起复制进构建产物，可以显式开启：
 
@@ -37,8 +53,11 @@ npm test
 - `HTTPS_CERT_FILE`：可选，HTTPS 证书文件路径；与 `HTTPS_KEY_FILE` 必须同时提供
 - `OLLAMA_HOST`：本地 Ollama 地址，默认 `http://localhost:11434`
 - `OLLAMA_MODEL`：生成模型，默认 `gemma4:e2b`
-- `ANTHROPIC_BASE_URL`：评分接口基础地址，默认 `https://aihub.firstshare.cn`
-- `ANTHROPIC_AUTH_TOKEN`：评分接口 Bearer Token
+- `SCORE_API_BASE_URL`：可选，评分接口基础地址，默认 `https://api.openai.com`
+- `SCORE_API_AUTH_TOKEN`：可选，评分接口 Bearer Token
+- `SCORE_API_MODEL`：可选，评分模型，默认 `gpt-5.4`
+- `ANTHROPIC_BASE_URL`：旧兼容变量，仍可作为 `SCORE_API_BASE_URL` 的回退
+- `ANTHROPIC_AUTH_TOKEN`：旧兼容变量，仍可作为 `SCORE_API_AUTH_TOKEN` 的回退
 
 为了本机内网体验方便，仓库还提供了一个固定脚本：
 
@@ -46,7 +65,41 @@ npm test
 npm run start:https
 ```
 
-它等价于使用 `.local/certs/gemma4-preview-key.pem` 和 `.local/certs/gemma4-preview.pem` 在 `3443` 端口启动原生 HTTPS 服务。
+它等价于使用 `.local/certs/browser-llm-kit-preview-key.pem` 和 `.local/certs/browser-llm-kit-preview.pem` 在 `3443` 端口启动原生 HTTPS 服务。
+
+## 仓库结构
+
+- `packages/llm-browser`：浏览器侧入口
+- `packages/llm-core`：核心协调层
+- `packages/llm-opfs`：安装与 OPFS 存储层
+- `packages/llm-worker`：worker client 与 worker 实现
+- `packages/llm-mediapipe`：MediaPipe 运行时适配层
+- `examples/meeting-notes-demo`：示例宿主
+  - `web/`：浏览器宿主
+    - `assets/llm/`：本地自备模型文件目录（默认不纳入版本控制）
+  - `server/`：Node 示例服务
+  - `shared/fixtures/`：示例模板和样本数据
+  - `shared/prompts/`：提示词
+  - `shared/`：共享 helper
+
+## Docs
+
+- [`docs/README.md`](docs/README.md)
+- [`docs/guides/browser-llm-service-integration.md`](docs/guides/browser-llm-service-integration.md)
+- [`docs/architecture/browser-llm-service.md`](docs/architecture/browser-llm-service.md)
+- [`examples/meeting-notes-demo/README.md`](examples/meeting-notes-demo/README.md)
+
+## Open Source Readiness
+
+已补齐：
+
+- 包边界
+- 示例宿主
+- 集成与架构文档
+- `CONTRIBUTING.md`
+- `CODE_OF_CONDUCT.md`
+- `SECURITY.md`
+- `LICENSE` (`MIT`)
 
 ## 处理链路
 
@@ -123,7 +176,7 @@ curl -X POST http://localhost:3001/ask \
 
 ### 3. `POST /run-tests`
 
-按样本执行生成，并把生成结果写回 `config/tests.json` 的 `result` 字段。
+按样本执行生成，并把生成结果写回 `examples/meeting-notes-demo/shared/fixtures/tests.json` 的 `result` 字段。
 
 **请求体字段：**
 
@@ -180,7 +233,7 @@ curl -X POST http://localhost:3001/run-tests \
 
 ### 4. `POST /score-tests`
 
-按样本对已有 `result` 进行评分，并把评分接口返回的完整结构化 JSON 写回 `config/tests.json` 的 `score` 字段。
+按样本对已有 `result` 进行评分，并把评分接口返回的完整结构化 JSON 写回 `examples/meeting-notes-demo/shared/fixtures/tests.json` 的 `score` 字段。
 
 **请求体字段：**
 
@@ -244,7 +297,7 @@ curl -X POST http://localhost:3001/score-tests \
 
 ### 5. `POST /run-and-score-tests`
 
-先执行生成，再立即评分，并把 `result` 与 `score` 一并写回 `config/tests.json`。
+先执行生成，再立即评分，并把 `result` 与 `score` 一并写回 `examples/meeting-notes-demo/shared/fixtures/tests.json`。
 
 **请求体字段：**
 
@@ -297,7 +350,7 @@ curl -X POST http://localhost:3001/run-and-score-tests \
 
 ## 测试数据回写说明
 
-测试样本位于 [config/tests.json](config/tests.json)。
+测试样本位于 [`examples/meeting-notes-demo/shared/fixtures/tests.json`](examples/meeting-notes-demo/shared/fixtures/tests.json)。
 
 - `POST /run-tests`：更新 `result`
 - `POST /score-tests`：更新 `score`

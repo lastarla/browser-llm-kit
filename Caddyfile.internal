@@ -1,9 +1,0 @@
-{
-	admin off
-}
-
-:3443 {
-	tls ./.local/certs/gemma4-preview.pem ./.local/certs/gemma4-preview-key.pem
-	encode zstd gzip
-	reverse_proxy 127.0.0.1:3001
-}

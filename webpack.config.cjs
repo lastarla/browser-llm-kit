@@ -3,38 +3,41 @@ const CopyPlugin = require('copy-webpack-plugin');
 
 const copyPatterns = [
   {
-    from: path.resolve(__dirname, 'front/index.html'),
-    to: path.resolve(__dirname, 'dist/front/index.html'),
+    from: path.resolve(__dirname, 'examples/meeting-notes-demo/web/index.html'),
+    to: path.resolve(__dirname, 'dist/examples/meeting-notes-demo/web/index.html'),
   },
   {
-    from: path.resolve(__dirname, 'front/styles.css'),
-    to: path.resolve(__dirname, 'dist/front/styles.css'),
+    from: path.resolve(__dirname, 'examples/meeting-notes-demo/web/sdk-host.html'),
+    to: path.resolve(__dirname, 'dist/examples/meeting-notes-demo/web/sdk-host.html'),
   },
   {
-    from: path.resolve(__dirname, 'front/llm-asset-sw.js'),
-    to: path.resolve(__dirname, 'dist/front/llm-asset-sw.js'),
+    from: path.resolve(__dirname, 'examples/meeting-notes-demo/web/styles.css'),
+    to: path.resolve(__dirname, 'dist/examples/meeting-notes-demo/web/styles.css'),
   },
   {
     from: path.resolve(__dirname, 'node_modules/@mediapipe/tasks-genai/wasm'),
-    to: path.resolve(__dirname, 'dist/front/wasm'),
+    to: path.resolve(__dirname, 'dist/examples/meeting-notes-demo/web/wasm'),
     noErrorOnMissing: true,
   },
 ];
 
 if (process.env.COPY_LLM_ASSETS === 'true') {
   copyPatterns.push({
-    from: path.resolve(__dirname, 'front/assets'),
-    to: path.resolve(__dirname, 'dist/front/assets'),
+    from: path.resolve(__dirname, 'examples/meeting-notes-demo/web/assets'),
+    to: path.resolve(__dirname, 'dist/examples/meeting-notes-demo/web/assets'),
     noErrorOnMissing: true,
   });
 }
 
 module.exports = {
   mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
-  entry: path.resolve(__dirname, 'front/app.js'),
+  entry: {
+    app: path.resolve(__dirname, 'examples/meeting-notes-demo/web/app.js'),
+    'sdk-host': path.resolve(__dirname, 'examples/meeting-notes-demo/web/sdk-host.js'),
+  },
   output: {
-    path: path.resolve(__dirname, 'dist/front'),
-    filename: 'app.js',
+    path: path.resolve(__dirname, 'dist/examples/meeting-notes-demo/web'),
+    filename: '[name].js',
     clean: true,
   },
   devtool: process.env.NODE_ENV === 'production' ? false : 'source-map',
